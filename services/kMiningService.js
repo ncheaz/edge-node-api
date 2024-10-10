@@ -4,9 +4,9 @@ const fs = require('fs');
 const datasetService = require('./datasetService.js');
 
 exports.defineProcessingPipelineId = async (req) => {
-    const kmining_json_pipeline_id = req.user.config.find(item => item.option === 'kmining_json_pipeline_id').value;
-    const kmining_pdf_pipeline_id = req.user.config.find(item => item.option === 'kmining_pdf_pipeline_id').value;
-    const kmining_csv_pipeline_id = req.user.config.find(item => item.option === 'kmining_csv_pipeline_id').value;
+    const kmining_json_pipeline_id = req.user.config.find(item => item.option === 'kmining_json_pipeline_id')?.value;
+    const kmining_pdf_pipeline_id = req.user.config.find(item => item.option === 'kmining_pdf_pipeline_id')?.value;
+    const kmining_csv_pipeline_id = req.user.config.find(item => item.option === 'kmining_csv_pipeline_id')?.value;
 
     if(req.file.mimetype === 'application/json') {
         return kmining_json_pipeline_id;

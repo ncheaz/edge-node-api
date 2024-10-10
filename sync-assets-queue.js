@@ -122,8 +122,8 @@ function getFormattedDate2(date) {
 }
 
 async function storeNotification(assets) {
-    let notification = await Notification.create({ title: "New hash lists"});
-    notification.message = `Your node has ingested ${assets.length} new hash lists (knowledge assets) since your last login.`
+    let notification = await Notification.create({ title: "New Knowledge assets are created!"});
+    notification.message = `Your node has ingested ${assets.length} new knowledge assets since your last login.`
     await notification.save();
     return notification;
 }
