@@ -20,10 +20,9 @@
 6. npm run start
 
 ## Dependencies
-1. Edge node Knowledge mining - app is being used for input file processing and creating Knowledge asset content
-2. Edge node Authentication service - app is being used as middleware for every API request to Edge node backend - session/cookie is being validated. Also, app contains all important Edge node config params like Knowledge mining endpoint, DRAG endpoint, KMining pipeline id etc
+1. **Edge node Knowledge mining** - app is being used for input file processing and creating Knowledge asset content
+2. **Edge node Authentication service** - app is being used as middleware for every API request to Edge node backend - session/cookie is being validated. Also, app contains all important Edge node config params like Knowledge mining endpoint, DRAG endpoint, KMining pipeline id etc
 
 App will be exposed on http://localhost:3002
-Edge node UI .env should be updated with backend endpoint (VITE_EDGE_NODE_BACKEND_ENDPOINT)
 
 ***NOTE***: All Edge node backend settings parameters are set in Edge node auth service app DB and this app will not work if Auth service is not running and properly set.
