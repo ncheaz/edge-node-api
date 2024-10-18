@@ -254,75 +254,86 @@ exports.confirmAndCreateAssets = async (req, res) => {
                             wallet
                         );
 
-                        const UAL = result.UAL;
-                        const parsedContent = JSON.parse(content);
-                        const kaForVectorize =
-                            parsedContent.private ||
-                            parsedContent.public ||
-                            parsedContent;
-                        const contentForVectorize = [
-                            {
-                                ...kaForVectorize,
-                                ual: UAL
+                        const vectorizationEnabled = req.user.config.find(
+                            (item) => item.option === 'vectorization_enabled'
+                        ).value;
+
+                        if (vectorizationEnabled === 'true') {
+                            const UAL = result.UAL;
+                            const parsedContent = JSON.parse(content);
+                            const kaForVectorize =
+                                parsedContent.private ||
+                                parsedContent.public ||
+                                parsedContent;
+                            const contentForVectorize = [
+                                {
+                                    ...kaForVectorize,
+                                    ual: UAL
+                                }
+                            ];
+                            const storageDir = path.join(
+                                __dirname,
+                                '../storage/vector_assets'
+                            );
+                            const sanitizedUAL = UAL.replace(
+                                /[:/\\?%*|"<>]/g,
+                                '_'
+                            );
+                            const filePath = path.join(
+                                storageDir,
+                                `${sanitizedUAL}.json`
+                            );
+                            if (!fs.existsSync(storageDir)) {
+                                fs.mkdirSync(storageDir);
                             }
-                        ];
-                        const storageDir = path.join(
-                            __dirname,
-                            '../storage/vector_assets'
-                        );
-                        const sanitizedUAL = UAL.replace(/[:/\\?%*|"<>]/g, '_');
-                        const filePath = path.join(
-                            storageDir,
-                            `${sanitizedUAL}.json`
-                        );
-                        if (!fs.existsSync(storageDir)) {
-                            fs.mkdirSync(storageDir);
-                        }
-                        fs.writeFileSync(
-                            filePath,
-                            JSON.stringify(contentForVectorize, null, 2)
-                        );
-                        try {
-                            const kMiningEndpoint = req.user.config.find(
-                                (item) => item.option === 'kmining_endpoint'
-                            ).value;
-                            const vectorizePipeline = req.user.config.find(
-                                (item) => item.option === 'vectorize_pipeline'
-                            ).value;
-                            const embeddingsAndMetadata =
-                                await kMiningService.triggerPipeline(
-                                    { path: filePath },
-                                    sessionCookie,
-                                    kMiningEndpoint,
-                                    vectorizePipeline,
-                                    null
+                            fs.writeFileSync(
+                                filePath,
+                                JSON.stringify(contentForVectorize, null, 2)
+                            );
+                            try {
+                                const kMiningEndpoint = req.user.config.find(
+                                    (item) => item.option === 'kmining_endpoint'
+                                ).value;
+                                const vectorizePipeline = req.user.config.find(
+                                    (item) =>
+                                        item.option === 'vectorize_pipeline'
+                                ).value;
+
+                                const embeddingsAndMetadata =
+                                    await kMiningService.triggerPipeline(
+                                        { path: filePath },
+                                        sessionCookie,
+                                        kMiningEndpoint,
+                                        vectorizePipeline,
+                                        null
+                                    );
+                                if (
+                                    !embeddingsAndMetadata.embeddings ||
+                                    !embeddingsAndMetadata.texts ||
+                                    !embeddingsAndMetadata.metadatas
+                                ) {
+                                    throw Error(
+                                        'KA Mining did not return a valid vector DB entry object.'
+                                    );
+                                }
+                                milvusService.setUserConfig(req.user.config);
+                                milvusService.initMilvusClient();
+                                const milvusResult = await milvusService.insert(
+                                    embeddingsAndMetadata
                                 );
-                            if (
-                                !embeddingsAndMetadata.embeddings ||
-                                !embeddingsAndMetadata.texts ||
-                                !embeddingsAndMetadata.metadatas
-                            ) {
-                                throw Error(
-                                    'KA Mining did not return a valid vector DB entry object.'
+                                console.log(
+                                    `Performed Milvus insert with status ${JSON.stringify(
+                                        milvusResult.status
+                                    )}`
+                                );
+                            } catch (error) {
+                                console.error(
+                                    'Error during vectorization pipeline:',
+                                    error
                                 );
                             }
-                            milvusService.setUserConfig(req.user.config);
-                            milvusService.initMilvusClient();
-                            const milvusResult = await milvusService.insert(
-                                embeddingsAndMetadata
-                            );
-                            console.log(
-                                `Performed Milvus insert with statuses ${JSON.stringify(
-                                    milvusResult.summaryInsertResponse.status
-                                )}\n\n${JSON.stringify(
-                                    milvusResult.titleInsertResponse.status
-                                )}`
-                            );
-                        } catch (error) {
-                            console.error(
-                                'Error during vectorization pipeline:',
-                                error
-                            );
+                        } else {
+                            console.log('Skipping vectorization');
                         }
                     }
                     if (knowledgeAssets.length === 1) {
