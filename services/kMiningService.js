@@ -43,8 +43,8 @@ exports.triggerPipeline = async (
             file.mimetype === 'application/json'
                 ? 'json'
                 : file.mimetype === 'application/pdf'
-                  ? 'pdf'
-                  : 'csv'
+                ? 'pdf'
+                : 'csv'
         );
 
         let result = await axios.post(
@@ -62,12 +62,13 @@ exports.triggerPipeline = async (
         if (result.data.message === 'DAG triggered') {
             const pipelineId = result.data.pipeline_id;
             const runId = result.data.run_id;
-            await datasetService.storePipelineInfo(
-                inputDatasetDBRecord,
-                pipelineId,
-                runId
-            );
-
+            if (inputDatasetDBRecord) {
+                await datasetService.storePipelineInfo(
+                    inputDatasetDBRecord,
+                    pipelineId,
+                    runId
+                );
+            }
             while (true) {
                 await wait(1000);
 

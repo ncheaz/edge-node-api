@@ -23,7 +23,7 @@ class PublishService {
             environment: this.userConfig.edge_node_environment,
             endpoint: this.userConfig.run_time_node_endpoint,
             port: this.userConfig.run_time_node_port,
-            blockchain: blockchain,
+            blockchain: blockchain || this.userConfig.blockchain,
             maxNumberOfRetries: 30,
             frequency: 2,
             contentType: 'all'

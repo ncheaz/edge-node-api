@@ -7,6 +7,7 @@ const { OPERATION_STATUSES } = require('../helpers/utils');
 const publishService = require('../services/publishService.js');
 const { Op, Sequelize } = require('sequelize');
 const internalSequelize = require('../models/index');
+const milvusService = require('../services/milvusService.js');
 
 exports.getDatasets = async (req, res) => {
     try {
@@ -252,6 +253,77 @@ exports.confirmAndCreateAssets = async (req, res) => {
                             null,
                             wallet
                         );
+
+                        const UAL = result.UAL;
+                        const parsedContent = JSON.parse(content);
+                        const kaForVectorize =
+                            parsedContent.private ||
+                            parsedContent.public ||
+                            parsedContent;
+                        const contentForVectorize = [
+                            {
+                                ...kaForVectorize,
+                                ual: UAL
+                            }
+                        ];
+                        const storageDir = path.join(
+                            __dirname,
+                            '../storage/vector_assets'
+                        );
+                        const sanitizedUAL = UAL.replace(/[:/\\?%*|"<>]/g, '_');
+                        const filePath = path.join(
+                            storageDir,
+                            `${sanitizedUAL}.json`
+                        );
+                        if (!fs.existsSync(storageDir)) {
+                            fs.mkdirSync(storageDir);
+                        }
+                        fs.writeFileSync(
+                            filePath,
+                            JSON.stringify(contentForVectorize, null, 2)
+                        );
+                        try {
+                            const kMiningEndpoint = req.user.config.find(
+                                (item) => item.option === 'kmining_endpoint'
+                            ).value;
+                            const vectorizePipeline = req.user.config.find(
+                                (item) => item.option === 'vectorize_pipeline'
+                            ).value;
+                            const embeddingsAndMetadata =
+                                await kMiningService.triggerPipeline(
+                                    { path: filePath },
+                                    sessionCookie,
+                                    kMiningEndpoint,
+                                    vectorizePipeline,
+                                    null
+                                );
+                            if (
+                                !embeddingsAndMetadata.embeddings ||
+                                !embeddingsAndMetadata.texts ||
+                                !embeddingsAndMetadata.metadatas
+                            ) {
+                                throw Error(
+                                    'KA Mining did not return a valid vector DB entry object.'
+                                );
+                            }
+                            milvusService.setUserConfig(req.user.config);
+                            milvusService.initMilvusClient();
+                            const milvusResult = await milvusService.insert(
+                                embeddingsAndMetadata
+                            );
+                            console.log(
+                                `Performed Milvus insert with statuses ${JSON.stringify(
+                                    milvusResult.summaryInsertResponse.status
+                                )}\n\n${JSON.stringify(
+                                    milvusResult.titleInsertResponse.status
+                                )}`
+                            );
+                        } catch (error) {
+                            console.error(
+                                'Error during vectorization pipeline:',
+                                error
+                            );
+                        }
                     }
                     if (knowledgeAssets.length === 1) {
                         return res.status(200).json({
@@ -275,28 +347,22 @@ exports.confirmAndCreateAssets = async (req, res) => {
                         e.message,
                         wallet
                     );
-                    return res
-                        .status(500)
-                        .json({
-                            error: 'An error occurred while creating the knowledge asset',
-                            details: e.message
-                        });
+                    return res.status(500).json({
+                        error: 'An error occurred while creating the knowledge asset',
+                        details: e.message
+                    });
                 }
             }
         }
-        return res
-            .status(200)
-            .json({
-                message: 'Creation of knowledge assets has been started.'
-            });
+        return res.status(200).json({
+            message: 'Creation of knowledge assets has been started.'
+        });
     } catch (error) {
         console.error(error);
-        return res
-            .status(500)
-            .json({
-                error: 'An error occurred while processing the knowledge asset',
-                details: error.message
-            });
+        return res.status(500).json({
+            error: 'An error occurred while processing the knowledge asset',
+            details: error.message
+        });
     }
 };
 
@@ -327,5 +393,51 @@ exports.getAssetsMetadata = async (req, res) => {
     } catch (e) {
         console.error('Error getting assets metadata:', e);
         res.status(500).json({ error: 'Failed to get assets metadata' });
+    }
+};
+
+exports.query = async (req, res) => {
+    const {
+        query,
+        queryConfig: requestQueryConfig,
+        queryType = 'SELECT'
+    } = req.body;
+    const offset = parseInt(req.body.offset) || 0;
+    const limit = parseInt(req.body.limit) || 10;
+
+    try {
+        const userConfig = req.user.config;
+
+        const formattedUserConfig = publishService.setUserConfig(userConfig);
+
+        const queryConfig = {
+            // Uncomment if you want to query whole paranet
+            //   paranetUAL: formattedUserConfig.edge_node_paranet_ual,
+            graphLocation: 'LOCAL_KG',
+            graphState: 'CURRENT',
+            ...requestQueryConfig
+        };
+
+        const DkgClient = publishService.initDkgClient(
+            formattedUserConfig.blockchain
+        );
+
+        let result = await DkgClient.graph.query(query, queryType, queryConfig);
+
+        if (!Array.isArray(result?.data)) {
+            throw Error(`Error querying the network using query ${query}`);
+        }
+
+        const paginatedData = result.data.slice(offset, offset + limit);
+
+        res.json({
+            totalItems: result.data.length,
+            offset: offset,
+            limit: limit,
+            data: paginatedData
+        });
+    } catch (error) {
+        console.error(error.message);
+        res.status(500).json({ error: 'Failed to query network' });
     }
 };

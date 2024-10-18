@@ -45,5 +45,10 @@ router.post(
     authServiceMiddleware.authMiddleware,
     knowledgeBankController.confirmAndCreateAssets
 );
+router.post(
+    '/query',
+    authServiceMiddleware.authMiddleware,
+    knowledgeBankController.query
+);
 
 module.exports = router;
