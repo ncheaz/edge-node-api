@@ -1,6 +1,6 @@
-const path = require("path");
-const fs = require("fs");
-const multer = require("multer");
+const path = require('path');
+const fs = require('fs');
+const multer = require('multer');
 
 exports.createStorageFolder = () => {
     const storageDir = path.join(__dirname, '../storage');
@@ -15,7 +15,7 @@ exports.createStorageFolder = () => {
     if (!fs.existsSync(assetsDir)) {
         fs.mkdirSync(assetsDir, { recursive: true });
     }
-}
+};
 
 exports.setupUploaders = () => {
     const datasetsStorage = multer.diskStorage({
@@ -38,4 +38,4 @@ exports.setupUploaders = () => {
     });
     const uploadAsset = multer({ storage: assetsStorage });
     return { uploadDataset, uploadAsset };
-}
+};

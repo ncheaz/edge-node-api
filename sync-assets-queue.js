@@ -1,57 +1,69 @@
 const externalSequelize = require('./runtime-node-sequelize-connection');
-const {QueryTypes} = require('sequelize');
+const { QueryTypes } = require('sequelize');
 const sequelize = require('sequelize');
-const {SyncedAsset, Notification} = require('./models');
-const {Queue, Worker} = require('bullmq');
-const redis = require("ioredis");
+const { SyncedAsset, Notification } = require('./models');
+const { Queue, Worker } = require('bullmq');
+const redis = require('ioredis');
 const connection = new redis({
-    maxRetriesPerRequest: null,
+    maxRetriesPerRequest: null
 });
 
 const mockWait = (ms) => {
-    return new Promise(resolve => setTimeout(resolve, ms));
+    return new Promise((resolve) => setTimeout(resolve, ms));
 };
 
-const syncQueue = new Queue('syncQueue', {connection});
+const syncQueue = new Queue('syncQueue', { connection });
 
-new Worker('syncQueue', async (job) => {
-    console.log(`Starting sync job...Time: ${job.data.timestamp}`);
-    try {
-        let internalSyncedAssets = await SyncedAsset.count();
-        if (internalSyncedAssets === 0) {
-            console.log(`First time query...`);
-            const assets = await externalSequelize.query(getInitialQuery(), {
-                type: QueryTypes.SELECT
-            });
-            if(assets.length > 0) {
-                let notification = await storeNotification(assets);
-                await storeSyncedAssets(assets, notification);
+new Worker(
+    'syncQueue',
+    async (job) => {
+        console.log(`Starting sync job...Time: ${job.data.timestamp}`);
+        try {
+            let internalSyncedAssets = await SyncedAsset.count();
+            if (internalSyncedAssets === 0) {
+                console.log(`First time query...`);
+                const assets = await externalSequelize.query(
+                    getInitialQuery(),
+                    {
+                        type: QueryTypes.SELECT
+                    }
+                );
+                if (assets.length > 0) {
+                    let notification = await storeNotification(assets);
+                    await storeSyncedAssets(assets, notification);
+                }
+            } else if (internalSyncedAssets > 0) {
+                const lastSyncedAsset = await SyncedAsset.findOne({
+                    order: [['id', 'DESC']]
+                });
+                const assets = await externalSequelize.query(
+                    getNextQuery(
+                        getFormattedDate2(lastSyncedAsset.backend_synced_at)
+                    ),
+                    {
+                        type: QueryTypes.SELECT
+                    }
+                );
+                if (assets.length > 0) {
+                    let notification = await storeNotification(assets);
+                    await storeSyncedAssets(assets, notification);
+                }
             }
-        } else if (internalSyncedAssets > 0) {
-            const lastSyncedAsset = await SyncedAsset.findOne({
-                order: [['id', 'DESC']]
-            });
-            const assets = await externalSequelize.query(getNextQuery(getFormattedDate2(lastSyncedAsset.backend_synced_at)), {
-                type: QueryTypes.SELECT
-            });
-            if(assets.length > 0) {
-                let notification = await storeNotification(assets);
-                await storeSyncedAssets(assets, notification);
-            }
+        } catch (error) {
+            console.error(error);
         }
-    } catch (error) {
-        console.error(error);
+        console.log(`Sync job completed.Time: ${job.data.timestamp}`);
+    },
+    {
+        connection,
+        concurrency: 1 // Ensure only one job runs at a time
     }
-    console.log(`Sync job completed.Time: ${job.data.timestamp}`);
-}, {
-    connection,
-    concurrency: 1  // Ensure only one job runs at a time
-});
+);
 
 // Add Jobs Every 30 Seconds
 setInterval(async () => {
     console.log('Queueing sync job...');
-    await syncQueue.add('syncJob', {timestamp: Date.now()});
+    await syncQueue.add('syncJob', { timestamp: Date.now() });
 }, 10000);
 
 const getInitialQuery = () => {
@@ -66,8 +78,8 @@ const getInitialQuery = () => {
                    FROM paranet_synced_asset
                    GROUP BY ual)
             GROUP BY ual) latest
-                            ON sa.id = latest.max_id`
-}
+                            ON sa.id = latest.max_id`;
+};
 
 const getNextQuery = (date) => {
     return `
@@ -84,8 +96,8 @@ const getNextQuery = (date) => {
                GROUP BY ual)
         GROUP BY ual
     ) latest
-                        ON sa.id = latest.max_id;`
-}
+                        ON sa.id = latest.max_id;`;
+};
 
 function getCurrentTimeProperFormat() {
     const now = new Date();
@@ -122,8 +134,10 @@ function getFormattedDate2(date) {
 }
 
 async function storeNotification(assets) {
-    let notification = await Notification.create({ title: "New Knowledge assets are created!"});
-    notification.message = `Your node has ingested ${assets.length} new knowledge assets since your last login.`
+    let notification = await Notification.create({
+        title: 'New Knowledge assets are created!'
+    });
+    notification.message = `Your node has ingested ${assets.length} new knowledge assets since your last login.`;
     await notification.save();
     return notification;
 }
@@ -132,7 +146,9 @@ async function storeSyncedAssets(assets, notification) {
     for (let x = 0; x < assets.length; x++) {
         let syncedData = assets[x];
         syncedData.backend_synced_at = getCurrentTimeProperFormat();
-        syncedData.runtime_node_synced_at = getFormattedDate(syncedData.created_at);
+        syncedData.runtime_node_synced_at = getFormattedDate(
+            syncedData.created_at
+        );
         syncedData.notification_id = notification.id;
         delete syncedData.id;
         delete syncedData.created_at;

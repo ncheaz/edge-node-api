@@ -1,17 +1,17 @@
 const DKG = require('dkg.js');
 
 let DkgClient = new DKG({
-    environment: "testnet",
-    endpoint: "",
-    port: "8900",
+    environment: 'testnet',
+    endpoint: '',
+    port: '8900',
     blockchain: {
-        name: "base:84532",
-        publicKey: "",
-        privateKey: ""
+        name: 'base:84532',
+        publicKey: '',
+        privateKey: ''
     },
     maxNumberOfRetries: 30,
     frequency: 2,
-    contentType: 'all',
+    contentType: 'all'
 });
 
 let KAContent = {
@@ -19,15 +19,15 @@ let KAContent = {
         '@context': ['https://schema.org'],
         '@id': 'urn:id:paranet:1',
         paranetName: 'MyParanet',
-        paranetDescription: 'Local development',
-    },
+        paranetDescription: 'Local development'
+    }
 };
 
 async function createParanet() {
     let KA = await DkgClient.asset.create(KAContent, {
-        epochsNum: 2,
-    })
-    if(KA.operation.publish.status === 'COMPLETED') {
+        epochsNum: 2
+    });
+    if (KA.operation.publish.status === 'COMPLETED') {
         let paranetKA = await DkgClient.paranet.create(KA.UAL, {
             paranetName: KAContent.public.paranetName,
             paranetDescription: KAContent.public.paranetDescription
@@ -36,5 +36,4 @@ async function createParanet() {
     }
 }
 
-createParanet()
-
+createParanet();

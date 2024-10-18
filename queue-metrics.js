@@ -12,14 +12,17 @@ setInterval(() => {
 setInterval(async () => {
     const jobCountsByWallet = {}; // Store metrics per wallet
     const jobs = await Promise.all(
-        Object.keys(queues).map((wallet) => queues[wallet].getJobs(['waiting', 'active']))
+        Object.keys(queues).map((wallet) =>
+            queues[wallet].getJobs(['waiting', 'active'])
+        )
     );
 
     for (const job of jobs.flat()) {
-        const {wallet} = job.data;
+        const { wallet } = job.data;
         const state = await job.getState();
 
-        if (!jobCountsByWallet[wallet]) jobCountsByWallet[wallet] = {waiting: 0, active: 0};
+        if (!jobCountsByWallet[wallet])
+            jobCountsByWallet[wallet] = { waiting: 0, active: 0 };
         if (state === 'waiting') jobCountsByWallet[wallet].waiting += 1;
         if (state === 'active') jobCountsByWallet[wallet].active += 1;
     }
