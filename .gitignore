@@ -2,3 +2,5 @@ node_modules
 storage/assets
 storage/datasets
 .env
+.idea
+.DS_Store

@@ -15,7 +15,11 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // List of allowed origins
-const allowedOrigins = ['http://localhost:8100', 'http://localhost:5173', process.env.UI_ENDPOINT];
+const allowedOrigins = [
+    'http://localhost:8100',
+    'http://localhost:5173',
+    process.env.UI_ENDPOINT
+];
 
 // CORS configuration function
 const corsOptions = {
@@ -26,7 +30,7 @@ const corsOptions = {
             callback(new Error('Not allowed by CORS'));
         }
     },
-    credentials: true, // Allow credentials (cookies, authorization headers, etc.)
+    credentials: true // Allow credentials (cookies, authorization headers, etc.)
 };
 
 app.use(cors(corsOptions));
@@ -41,8 +45,9 @@ app.use('/dashboard', dashboardRoutes);
 app.use('/knowledge-bank', knowledgeBankRoutes);
 app.use('/notifications', notificationRoutes);
 
-app.listen(port, () => {
+const server = app.listen(port, () => {
     console.log(`Edge node backend running on port ${port}`);
 });
+server.setTimeout(120000);
 
 module.exports = app;
