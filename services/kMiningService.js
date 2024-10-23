@@ -8,6 +8,9 @@ exports.defineProcessingPipelineId = async (req) => {
     const kmining_pdf_pipeline_id = req.user.config.find(item => item.option === 'kmining_pdf_pipeline_id')?.value;
     const kmining_csv_pipeline_id = req.user.config.find(item => item.option === 'kmining_csv_pipeline_id')?.value;
 
+    if(req.file.mimetype === 'application/ld+json') {
+        return "simple_json_to_jsonld";
+    }
     if(req.file.mimetype === 'application/json') {
         return kmining_json_pipeline_id;
     }
@@ -27,7 +30,7 @@ exports.triggerPipeline = async (file, sessionCookie, kMiningEndpoint, kMiningPi
         formData.append('file', fs.createReadStream(filePath));
         formData.append('pipelineId', kMiningPipelineId);
         formData.append('fileFormat',
-            file.mimetype === 'application/json'
+            file.mimetype === 'application/json' || file.mimetype === 'application/ld+json'
             ? 'json'
             : file.mimetype === 'application/pdf'
                 ? 'pdf'
