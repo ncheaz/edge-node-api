@@ -90,26 +90,26 @@ class PublishService {
     }
 
     async internalPublishService(asset, edgeNodePublishMode, paranetUAL, wallet = null) {
-        if(edgeNodePublishMode === "public") {
-            return await this.dkgClient.asset.create(asset, {
-                epochsNum: 2
-            });
+        switch (edgeNodePublishMode) {
+            case "public":
+                return await this.dkgClient.asset.create(asset, {
+                    epochsNum: 2
+                });
+            case "paranet":
+                return await this.dkgClient.asset.create(asset, {
+                    epochsNum: 2,
+                    paranetUAL: paranetUAL
+                });
+            case "curated_paranet":
+                return await this.dkgClient.asset.localStore(asset, {
+                    epochsNum: 2,
+                    paranetUAL: paranetUAL
+                });
+            default:
+                return await this.dkgClient.asset.create(asset, {
+                    epochsNum: 2
+                });
         }
-        if(edgeNodePublishMode === "paranet") {
-            return await this.dkgClient.asset.create(asset, {
-                epochsNum: 2,
-                paranetUAL: paranetUAL
-            });
-        }
-        if(edgeNodePublishMode === "curated_paranet") {
-            return await this.dkgClient.asset.localStore(asset, {
-                epochsNum: 2,
-                paranetUAL: paranetUAL
-            });
-        }
-        return await this.dkgClient.asset.create(asset, {
-            epochsNum: 2
-        });
     }
 
     definePublishType(endpoint) {
