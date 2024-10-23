@@ -1,7 +1,7 @@
-import path from "path";
-import fs from "fs";
-import kMiningService from "./kMiningService";
-import milvusService from "./milvusService";
+const path = require('path');
+const fs = require('fs');
+const kMiningService = require('./kMiningService');
+const milvusService = require('./milvusService');
 
 class VectorService {
     constructor() {
@@ -28,28 +28,16 @@ class VectorService {
             });
         }
 
-        if (
-            !parsedContent.private &&
-            !parsedContent.public
-        ) {
+        if (!parsedContent.private && !parsedContent.public) {
             contentForVectorize.push({
                 ...parsedContent,
                 ual: UAL
             });
         }
 
-        const storageDir = path.join(
-            __dirname,
-            '../storage/vector_assets'
-        );
-        const sanitizedUAL = UAL.replace(
-            /[:/\\?%*|"<>]/g,
-            '_'
-        );
-        const filePath = path.join(
-            storageDir,
-            `${sanitizedUAL}.json`
-        );
+        const storageDir = path.join(__dirname, '../storage/vector_assets');
+        const sanitizedUAL = UAL.replace(/[:/\\?%*|"<>]/g, '_');
+        const filePath = path.join(storageDir, `${sanitizedUAL}.json`);
         if (!fs.existsSync(storageDir)) {
             fs.mkdirSync(storageDir);
         }
@@ -59,21 +47,19 @@ class VectorService {
         );
         try {
             const kMiningEndpoint = req.user.config.find(
-                (item) => item.option === 'kmining_endpoint'
+                item => item.option === 'kmining_endpoint'
             ).value;
             const vectorizePipeline = req.user.config.find(
-                (item) =>
-                    item.option === 'vectorize_pipeline'
+                item => item.option === 'vectorize_pipeline'
             ).value;
 
-            const embeddingsAndMetadata =
-                await kMiningService.triggerPipeline(
-                    {path: filePath},
-                    sessionCookie,
-                    kMiningEndpoint,
-                    vectorizePipeline,
-                    null
-                );
+            const embeddingsAndMetadata = await kMiningService.triggerPipeline(
+                { path: filePath },
+                sessionCookie,
+                kMiningEndpoint,
+                vectorizePipeline,
+                null
+            );
             if (
                 !embeddingsAndMetadata.embeddings ||
                 !embeddingsAndMetadata.texts ||
@@ -94,10 +80,7 @@ class VectorService {
                 )}`
             );
         } catch (error) {
-            console.error(
-                'Error during vectorization pipeline:',
-                error
-            );
+            console.error('Error during vectorization pipeline:', error);
         }
     }
 }
