@@ -14,6 +14,10 @@ exports.defineProcessingPipelineId = async (req) => {
         (item) => item.option === 'kmining_csv_pipeline_id'
     )?.value;
 
+
+    if (req.file.mimetype === 'application/ld+json') {
+        return "simple_json_to_jsonld";
+    }
     if (req.file.mimetype === 'application/json') {
         return kmining_json_pipeline_id;
     }
@@ -41,6 +45,7 @@ exports.triggerPipeline = async (
         formData.append(
             'fileFormat',
             file.mimetype === 'application/json'
+            || file.mimetype === 'application/ld+json'
                 ? 'json'
                 : file.mimetype === 'application/pdf'
                 ? 'pdf'
