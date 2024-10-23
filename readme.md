@@ -17,7 +17,8 @@
       4. GRANT ALL PRIVILEGES ON*.*TO'username'@'%'WITH GRANT OPTION;
       5. FLUSH PRIVILEGES;
       6. update Edge node API .env with mysql connection details
-6. npm run start
+6. make sure redis is running on it's default port 6379
+7. npm run start
 
 ## Dependencies
 1. **Edge node Knowledge mining** - app is being used for input file processing and creating Knowledge asset content
