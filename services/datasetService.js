@@ -1,7 +1,7 @@
 const { Dataset, Asset } = require('../models');
 const fs = require('fs');
 const path = require('path');
-const {OPERATION_STATUSES} = require("../helpers/utils");
+const { OPERATION_STATUSES } = require('../helpers/utils');
 
 exports.processUpload = async (file) => {
     // Logic for processing the uploaded file and saving the dataset
@@ -11,19 +11,25 @@ exports.getAll = async () => {
     return Dataset.findAll();
 };
 
-exports.storeInputDataset = async(relativePath, filename) => {
+exports.storeInputDataset = async (relativePath, filename) => {
     return await Dataset.create({
         filename: filename,
         url: relativePath,
-        processing_status: 'NOT-STARTED',
+        processing_status: 'NOT-STARTED'
     });
-}
+};
 
-exports.storeStagedAssetsToStorage = async (stagedKnowledgeAssets, inputDatasetDBRecord) => {
+exports.storeStagedAssetsToStorage = async (
+    stagedKnowledgeAssets,
+    inputDatasetDBRecord
+) => {
     let filenames = [];
     let inputStagedAssets = [];
     let assetsData = {};
-    if(typeof stagedKnowledgeAssets === 'object' && stagedKnowledgeAssets !== null) {
+    if (
+        typeof stagedKnowledgeAssets === 'object' &&
+        stagedKnowledgeAssets !== null
+    ) {
         inputStagedAssets.push(stagedKnowledgeAssets);
     } else {
         inputStagedAssets = stagedKnowledgeAssets;
@@ -51,7 +57,11 @@ exports.storeStagedAssetsToStorage = async (stagedKnowledgeAssets, inputDatasetD
     return { filenames, assetsData };
 };
 
-exports.storeStagedAssetsToDB = async (filenames, inputDatasetDBRecord, assetsData) => {
+exports.storeStagedAssetsToDB = async (
+    filenames,
+    inputDatasetDBRecord,
+    assetsData
+) => {
     let errors = [];
     let finalAssets = [];
 
@@ -64,8 +74,8 @@ exports.storeStagedAssetsToDB = async (filenames, inputDatasetDBRecord, assetsDa
                 publishing_status: 'NOT-STARTED'
             });
             finalAssets.push({
-               assetId: asset.id,
-               content: assetContent
+                assetId: asset.id,
+                content: assetContent
             });
         } catch (error) {
             errors.push(error);
@@ -84,7 +94,7 @@ exports.storeUpdatedKAContent = async (asset, knowledgeAssetContent) => {
         console.error('Error updating JSON file:', err);
         return false;
     }
-}
+};
 
 exports.markDatasetAsFailed = async (inputDatasetDBRecordId, error_message) => {
     let dataset = await Dataset.findByPk(inputDatasetDBRecordId);
@@ -93,30 +103,33 @@ exports.markDatasetAsFailed = async (inputDatasetDBRecordId, error_message) => {
         dataset.error_message = error_message;
         return await dataset.save();
     }
-}
+};
 
 exports.markDatasetAsInProgress = async (inputDatasetDBRecordId) => {
     let dataset = await Dataset.findByPk(inputDatasetDBRecordId);
     if (dataset) {
-        dataset.processing_status = OPERATION_STATUSES["IN-PROGRESS"];
+        dataset.processing_status = OPERATION_STATUSES['IN-PROGRESS'];
         return await dataset.save();
     }
-}
+};
 
-exports.updateDatasetProcessingStatus = async (inputDatasetDBRecordId, status, error_message = null) => {
+exports.updateDatasetProcessingStatus = async (
+    inputDatasetDBRecordId,
+    status,
+    error_message = null
+) => {
     let dataset = await Dataset.findByPk(inputDatasetDBRecordId);
     if (dataset) {
         dataset.processing_status = status;
-        if(error_message !== null) {
+        if (error_message !== null) {
             dataset.error_message = error_message;
         }
         return await dataset.save();
     }
-}
+};
 
-exports.storePipelineInfo = async(inputDatasetDBRecord, pipelineId, runId) => {
+exports.storePipelineInfo = async (inputDatasetDBRecord, pipelineId, runId) => {
     inputDatasetDBRecord.pipeline_id = pipelineId;
     inputDatasetDBRecord.run_id = runId;
     return await inputDatasetDBRecord.save();
-}
-
+};
