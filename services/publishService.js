@@ -79,7 +79,7 @@ class PublishService {
     }
 
     async internalPublishService(asset, paranetUAL, wallet = null) {
-        return await this.dkgClient.asset.createParanet(asset, {
+        return await this.dkgClient.asset.localStore(asset, {
             epochsNum: 2,
             paranetUAL : paranetUAL
         });
@@ -142,8 +142,8 @@ class PublishService {
     }
 
     async updatePublishingStatus(asset, status, result = null, operation_message = null, wallet = null) {
-        asset.publishing_status = this.parseStatus(status, result);
-        asset.operation_id = (result?.operation?.publish?.operationId) ? result.operation.publish.operationId : null;
+        asset.publishing_status = status;
+        asset.operation_id = (result?.operation?.localStore?.operationId) ? result.operation.localStore.operationId : null;
         asset.operation_message = (operation_message !== null) ? operation_message : this.parseOperationMessage(result);
         asset.ual = (result?.UAL) ? result.UAL : null;
         asset.assertion_id = (result?.publicAssertionId) ? result.publicAssertionId : null;
@@ -153,19 +153,19 @@ class PublishService {
         await asset.save();
     }
 
-    parseStatus(status, result) {
-        if(Object.keys(OPERATION_STATUSES).includes(status)) {
-            return status;
+    parseOperationMessage(result) {
+        if (result?.operation?.localStore?.errorType) {
+            return result?.operation?.localStore?.errorMessage;
+        }
+        return null;
+    }
+
+    defineStatus(localStoreStatus, submitToParanetStatus) {
+        if(localStoreStatus === OPERATION_STATUSES.COMPLETED && submitToParanetStatus) {
+            return OPERATION_STATUSES.COMPLETED;
         } else {
             return OPERATION_STATUSES.FAILED;
         }
-    }
-
-    parseOperationMessage(result) {
-        if (result?.operation?.publish?.errorType) {
-            return result?.operation?.publish?.errorMessage;
-        }
-        return null;
     }
 }
 

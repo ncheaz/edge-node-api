@@ -41,8 +41,9 @@ app.use('/dashboard', dashboardRoutes);
 app.use('/knowledge-bank', knowledgeBankRoutes);
 app.use('/notifications', notificationRoutes);
 
-app.listen(port, () => {
+const server = app.listen(port, () => {
     console.log(`Edge node backend running on port ${port}`);
 });
+server.setTimeout(120000);
 
 module.exports = app;

@@ -200,8 +200,10 @@ exports.confirmAndCreateAssets = async (req, res) => {
                     const result = await publishService.createAsset(publishServiceEndpoint, JSON.parse(content), wallet);
                     console.timeEnd('Asset create');
 
-                    if (result && result?.operation?.publish) {
-                        await publishService.updatePublishingStatus(asset, result.operation.publish.status, result, null, wallet);
+                    if (result && result?.operation?.localStore && result && result?.operation?.submitToParanet) {
+                        await publishService.updatePublishingStatus(asset, publishService.defineStatus(result.operation.localStore.status, result.operation.submitToParanet.status), result, null, wallet);
+                    } else {
+                        await publishService.updatePublishingStatus(asset, OPERATION_STATUSES.FAILED, result, "Something went wrong! Publish data is missing.", wallet);
                     }
                     if (knowledgeAssets.length === 1) {
                         return res.status(200).json({
@@ -209,7 +211,7 @@ exports.confirmAndCreateAssets = async (req, res) => {
                                 UAL: result.UAL,
                                 assertionId: result.publicAssertionId,
                                 transactionHash: result?.operation?.mintKnowledgeAsset.transactionHash,
-                                status: result.operation.status
+                                status: publishService.defineStatus(result.operation.localStore.status, result.operation.submitToParanet.status)
                             }
                         });
                     }

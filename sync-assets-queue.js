@@ -31,7 +31,9 @@ new Worker('syncQueue', async (job) => {
             const lastSyncedAsset = await SyncedAsset.findOne({
                 order: [['id', 'DESC']]
             });
-            const assets = await externalSequelize.query(getNextQuery(getFormattedDate2(lastSyncedAsset.backend_synced_at)), {
+            const date = new Date(lastSyncedAsset.backend_synced_at);
+            const utcDateString = date.toISOString().replace('Z', '').replace('T', ' ').slice(0, 19);
+            const assets = await externalSequelize.query(getNextQuery(utcDateString), {
                 type: QueryTypes.SELECT
             });
             if(assets.length > 0) {
@@ -76,11 +78,11 @@ const getNextQuery = (date) => {
              INNER JOIN (
         SELECT ual, MAX(id) AS max_id
         FROM paranet_synced_asset
-        WHERE created_at > '${date}'  -- Replace with your desired date
+        WHERE created_at > CONVERT_TZ('${date}', @@session.time_zone, '+00:00')
           AND (ual, created_at) IN
               (SELECT ual, MAX(created_at)
                FROM paranet_synced_asset
-               WHERE created_at > '${date}'  -- Same date filter here
+               WHERE created_at > CONVERT_TZ('${date}', @@session.time_zone, '+00:00')
                GROUP BY ual)
         GROUP BY ual
     ) latest
