@@ -12,6 +12,7 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
+    "@zilliz/milvus2-sdk-node": "^2.4.9",
     "axios": "^1.7.4",
     "bullmq": "^5.13.2",
     "cookie-parser": "^1.4.6",
