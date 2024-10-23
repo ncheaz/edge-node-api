@@ -180,7 +180,7 @@ async function storeSyncedAssets(assets, notification) {
     return true;
 }
 
-// Add Jobs Every 30 Seconds
+// Add Jobs Every 10 Seconds
 setInterval(async () => {
     console.log('Queueing sync job...');
     await syncQueue.add('syncJob', { timestamp: Date.now() });
