@@ -2,11 +2,11 @@ const datasetService = require('../services/datasetService');
 const kMiningService = require('../services/kMiningService');
 const path = require('path');
 const fs = require('fs');
-const {Asset, SyncedAsset} = require('../models');
-const {OPERATION_STATUSES} = require('../helpers/utils');
+const { Asset, SyncedAsset } = require('../models');
+const { OPERATION_STATUSES } = require('../helpers/utils');
 const publishService = require('../services/publishService.js');
 const vectorService = require('../services/vectorService.js');
-const {Op, Sequelize} = require('sequelize');
+const { Op, Sequelize } = require('sequelize');
 const internalSequelize = require('../models/index');
 const milvusService = require('../services/milvusService.js');
 
@@ -15,7 +15,7 @@ exports.getDatasets = async (req, res) => {
         const datasets = [];
         res.status(200).json(datasets);
     } catch (error) {
-        res.status(500).json({error: error.message});
+        res.status(500).json({ error: error.message });
     }
 };
 
@@ -56,12 +56,12 @@ exports.getAssets = async (req, res) => {
         });
     } catch (error) {
         console.error('Error fetching paginated assets:', error);
-        res.status(500).json({error: 'Failed to fetch assets'});
+        res.status(500).json({ error: 'Failed to fetch assets' });
     }
 };
 
 exports.previewAssetExternal = async (req, res) => {
-    const {assetUAL} = req.query;
+    const { assetUAL } = req.query;
 
     try {
         const sessionCookie = req.headers.cookie;
@@ -83,20 +83,20 @@ exports.previewAssetExternal = async (req, res) => {
         res.json(formattedKnowledgeAsset);
     } catch (error) {
         console.error('Error fetching asset:', error);
-        res.status(500).json({error: 'Server error'});
+        res.status(500).json({ error: 'Server error' });
     }
 };
 
 exports.previewAsset = async (req, res) => {
-    const {assetId} = req.params;
+    const { assetId } = req.params;
 
     try {
         const asset = await Asset.findOne({
-            where: {id: assetId}
+            where: { id: assetId }
         });
 
         if (!asset) {
-            return res.status(404).json({error: 'Asset not found'});
+            return res.status(404).json({ error: 'Asset not found' });
         }
 
         const filePath = path.join(__dirname, `../${asset.url}`);
@@ -104,13 +104,13 @@ exports.previewAsset = async (req, res) => {
         if (!fs.existsSync(filePath)) {
             return res
                 .status(404)
-                .json({error: 'File not found at the provided URL'});
+                .json({ error: 'File not found at the provided URL' });
         }
 
         const stream = fs.createReadStream(filePath);
-        stream.on('error', (error) => {
+        stream.on('error', error => {
             console.error('Error reading file:', error);
-            return res.status(500).json({error: 'Error reading file'});
+            return res.status(500).json({ error: 'Error reading file' });
         });
 
         res.setHeader('Content-Type', 'application/octet-stream');
@@ -122,7 +122,7 @@ exports.previewAsset = async (req, res) => {
         stream.pipe(res);
     } catch (error) {
         console.error('Error fetching asset or file:', error);
-        res.status(500).json({error: 'Server error'});
+        res.status(500).json({ error: 'Server error' });
     }
 };
 
@@ -147,7 +147,7 @@ exports.importDataset = async (req, res) => {
         );
 
         const kMiningEndpoint = req.user.config.find(
-            (item) => item.option === 'kmining_endpoint'
+            item => item.option === 'kmining_endpoint'
         ).value;
         const kMiningPipelineId =
             await kMiningService.defineProcessingPipelineId(req);
@@ -164,12 +164,12 @@ exports.importDataset = async (req, res) => {
         console.timeEnd('K Mining pipeline');
 
         console.time('Other');
-        let {filenames, assetsData} =
+        let { filenames, assetsData } =
             await datasetService.storeStagedAssetsToStorage(
                 stagedKnowledgeAssets,
                 inputDatasetDBRecord
             );
-        let {errors, finalAssets} =
+        let { errors, finalAssets } =
             await datasetService.storeStagedAssetsToDB(
                 filenames,
                 inputDatasetDBRecord,
@@ -204,7 +204,7 @@ exports.importDataset = async (req, res) => {
 exports.confirmAndCreateAssets = async (req, res) => {
     try {
         console.time('Prepare config');
-        const {knowledgeAssets} = req.body;
+        const { knowledgeAssets } = req.body;
         const sessionCookie = req.headers.cookie;
         let wallets = await publishService.getWallets(sessionCookie);
         const userConfig = req.user.config;
@@ -213,39 +213,79 @@ exports.confirmAndCreateAssets = async (req, res) => {
 
         if (knowledgeAssets.length > 0) {
             for (let index = 0; index < knowledgeAssets.length; index++) {
-
-                let {assetId, content} = knowledgeAssets[index];
+                let { assetId, content } = knowledgeAssets[index];
                 let asset = await Asset.findByPk(assetId);
                 let wallet = null;
 
                 try {
                     console.time('Before create');
-                    await datasetService.storeUpdatedKAContent(asset, JSON.parse(content));
-                    const publishServiceEndpoint = req.user.config.find((item) => item.option === 'publish_service_endpoint').value;
+                    await datasetService.storeUpdatedKAContent(
+                        asset,
+                        JSON.parse(content)
+                    );
+                    const publishServiceEndpoint = req.user.config.find(
+                        item => item.option === 'publish_service_endpoint'
+                    ).value;
 
-                    await publishService.updatePublishingStatus(asset, OPERATION_STATUSES['IN-PROGRESS'], null, null);
+                    await publishService.updatePublishingStatus(
+                        asset,
+                        OPERATION_STATUSES['IN-PROGRESS'],
+                        null,
+                        null
+                    );
 
                     wallet = await publishService.defineNextWallet(wallets);
                     console.timeEnd('Before create');
 
                     console.time('Asset create');
-                    const result = await publishService.createAsset(publishServiceEndpoint, JSON.parse(content), wallet);
+                    const result = await publishService.createAsset(
+                        publishServiceEndpoint,
+                        JSON.parse(content),
+                        wallet
+                    );
                     console.timeEnd('Asset create');
-
-                    if (result && result?.operation?.localStore && result && result?.operation?.submitToParanet) {
-                        const operationStatus = publishService.defineStatus(result.operation.localStore.status, result.operation.submitToParanet.status);
-                        await publishService.updatePublishingStatus(asset, operationStatus, result, null, wallet);
+                    console.log(result);
+                    if (
+                        result &&
+                        result?.operation?.localStore &&
+                        result &&
+                        result?.operation?.submitToParanet
+                    ) {
+                        const operationStatus = publishService.defineStatus(
+                            result.operation.localStore.status,
+                            result.operation.submitToParanet.status
+                        );
+                        await publishService.updatePublishingStatus(
+                            asset,
+                            operationStatus,
+                            result,
+                            null,
+                            wallet
+                        );
 
                         if (operationStatus === OPERATION_STATUSES.COMPLETED) {
-                            const vectorizationEnabled = req.user.config.find((item) => item.option === 'vectorization_enabled').value;
+                            const vectorizationEnabled = req.user.config.find(
+                                item => item.option === 'vectorization_enabled'
+                            ).value;
                             if (vectorizationEnabled === 'true') {
-                                await vectorService.vectorizeKnowledgeAsset(result, content, req, sessionCookie);
+                                await vectorService.vectorizeKnowledgeAsset(
+                                    result,
+                                    content,
+                                    req,
+                                    sessionCookie
+                                );
                             } else {
                                 console.log('Skipping vectorization');
                             }
                         }
                     } else {
-                        await publishService.updatePublishingStatus(asset, OPERATION_STATUSES.FAILED, result, "Something went wrong! Publish data is missing.", wallet);
+                        await publishService.updatePublishingStatus(
+                            asset,
+                            OPERATION_STATUSES.FAILED,
+                            result,
+                            'Something went wrong! Publish data is missing.',
+                            wallet
+                        );
                     }
                     if (knowledgeAssets.length === 1) {
                         return res.status(200).json({
@@ -254,14 +294,24 @@ exports.confirmAndCreateAssets = async (req, res) => {
                                 UAL: result.UAL,
                                 assertionId: result.publicAssertionId,
                                 transactionHash:
-                                result?.operation?.mintKnowledgeAsset.transactionHash,
-                                status: publishService.defineStatus(result.operation.localStore.status, result.operation.submitToParanet.status)
+                                    result?.operation?.mintKnowledgeAsset
+                                        .transactionHash,
+                                status: publishService.defineStatus(
+                                    result.operation.localStore?.status,
+                                    result.operation.submitToParanet?.status
+                                )
                             }
                         });
                     }
                 } catch (e) {
                     console.error(e);
-                    await publishService.updatePublishingStatus(asset, OPERATION_STATUSES.FAILED, null, e.message, wallet);
+                    await publishService.updatePublishingStatus(
+                        asset,
+                        OPERATION_STATUSES.FAILED,
+                        null,
+                        e.message,
+                        wallet
+                    );
                     return res.status(500).json({
                         error: 'An error occurred while creating the knowledge asset',
                         details: e.message
@@ -283,7 +333,7 @@ exports.confirmAndCreateAssets = async (req, res) => {
 
 exports.getAssetsMetadata = async (req, res) => {
     try {
-        const {uals} = req.body;
+        const { uals } = req.body;
         let finalData = {};
         if (uals.length > 0) {
             for (let x = 0; x < uals.length; x++) {
@@ -307,7 +357,7 @@ exports.getAssetsMetadata = async (req, res) => {
         });
     } catch (e) {
         console.error('Error getting assets metadata:', e);
-        res.status(500).json({error: 'Failed to get assets metadata'});
+        res.status(500).json({ error: 'Failed to get assets metadata' });
     }
 };
 
@@ -353,6 +403,6 @@ exports.query = async (req, res) => {
         });
     } catch (error) {
         console.error(error.message);
-        res.status(500).json({error: 'Failed to query network'});
+        res.status(500).json({ error: 'Failed to query network' });
     }
 };
