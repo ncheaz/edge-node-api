@@ -4,6 +4,7 @@ const sequelize = require('sequelize');
 const { SyncedAsset, Notification } = require('./models');
 const { Queue, Worker } = require('bullmq');
 const redis = require('ioredis');
+const axios = require('axios');
 const connection = new redis({
     maxRetriesPerRequest: null
 });
@@ -18,12 +19,34 @@ new Worker(
     'syncQueue',
     async (job) => {
         console.log(`Starting sync job...Time: ${job.data.timestamp}`);
+        console.log(`Checking Edge node publish mode...Time: ${job.data.timestamp}`);
+
+        const publicConfig = await axios.get(
+            `${process.env.AUTH_SERVICE_ENDPOINT}/auth/params/public`
+        );
+        const edgeNodePublishMode = publicConfig.data.config.find(
+            item => item.option === 'edge_node_publish_mode'
+        ).value || null;
+
+        if(edgeNodePublishMode === "public") {
+            console.log(`Edge node publish mode is public, aborting sync operation...Time: ${job.data.timestamp}`);
+            return;
+        }
+
+        const paranetUAL = publicConfig.data.config.find(
+            item => item.option === 'edge_node_paranet_ual'
+        ).value || null;
+
         try {
-            let internalSyncedAssets = await SyncedAsset.count();
-            if (internalSyncedAssets === 0) {
+            const internalSyncedAssets = await SyncedAsset.findAll({
+                where: {
+                    paranet_ual: paranetUAL,
+                },
+            });
+            if (internalSyncedAssets.length === 0) {
                 console.log(`First time query...`);
                 const assets = await externalSequelize.query(
-                    getInitialQuery(),
+                    getInitialQuery(paranetUAL),
                     {
                         type: QueryTypes.SELECT
                     }
@@ -32,13 +55,16 @@ new Worker(
                     let notification = await storeNotification(assets);
                     await storeSyncedAssets(assets, notification);
                 }
-            } else if (internalSyncedAssets > 0) {
+            } else if (internalSyncedAssets.length > 0) {
                 const lastSyncedAsset = await SyncedAsset.findOne({
+                    where: {
+                        paranet_ual: paranetUAL,
+                    },
                     order: [['id', 'DESC']]
                 });
                 const date = new Date(lastSyncedAsset.backend_synced_at);
             const utcDateString = date.toISOString().replace('Z', '').replace('T', ' ').slice(0, 19);
-            const assets = await externalSequelize.query(getNextQuery(utcDateString)
+            const assets = await externalSequelize.query(getNextQuery(utcDateString, paranetUAL)
                     ,
                     {
                         type: QueryTypes.SELECT
@@ -60,13 +86,7 @@ new Worker(
     }
 );
 
-// Add Jobs Every 30 Seconds
-setInterval(async () => {
-    console.log('Queueing sync job...');
-    await syncQueue.add('syncJob', { timestamp: Date.now() });
-}, 10000);
-
-const getInitialQuery = () => {
+const getInitialQuery = (paranetUAL) => {
     return `
         SELECT sa.*
         FROM paranet_synced_asset sa
@@ -77,26 +97,28 @@ const getInitialQuery = () => {
                   (SELECT ual, MAX(created_at)
                    FROM paranet_synced_asset
                    GROUP BY ual)
-            GROUP BY ual) latest
-                            ON sa.id = latest.max_id`;
+              AND paranet_ual = '${paranetUAL}'
+            GROUP BY ual
+        ) latest ON sa.id = latest.max_id;`;
 };
 
-const getNextQuery = (date) => {
+const getNextQuery = (date, paranetUAL) => {
     return `
-    SELECT sa.*
-    FROM paranet_synced_asset sa
-             INNER JOIN (
-        SELECT ual, MAX(id) AS max_id
-        FROM paranet_synced_asset
-        WHERE created_at > CONVERT_TZ('${date}', @@session.time_zone, '+00:00')
-          AND (ual, created_at) IN
-              (SELECT ual, MAX(created_at)
-               FROM paranet_synced_asset
-               WHERE created_at > CONVERT_TZ('${date}', @@session.time_zone, '+00:00')
-               GROUP BY ual)
-        GROUP BY ual
-    ) latest
-                        ON sa.id = latest.max_id;`;
+        SELECT sa.*
+        FROM paranet_synced_asset sa
+                 INNER JOIN (
+            SELECT ual, MAX(id) AS max_id
+            FROM paranet_synced_asset
+            WHERE created_at > CONVERT_TZ('${date}', @@session.time_zone, '+00:00')
+              AND (ual, created_at) IN
+                  (SELECT ual, MAX(created_at)
+                   FROM paranet_synced_asset
+                   WHERE created_at > CONVERT_TZ('${date}', @@session.time_zone, '+00:00')
+                   GROUP BY ual)
+              AND paranet_ual = '${paranetUAL}'
+            GROUP BY ual
+        ) latest ON sa.id = latest.max_id;
+    `;
 };
 
 function getCurrentTimeProperFormat() {
@@ -157,3 +179,9 @@ async function storeSyncedAssets(assets, notification) {
     }
     return true;
 }
+
+// Add Jobs Every 30 Seconds
+setInterval(async () => {
+    console.log('Queueing sync job...');
+    await syncQueue.add('syncJob', { timestamp: Date.now() });
+}, 10000);

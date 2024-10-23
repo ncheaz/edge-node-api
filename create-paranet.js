@@ -1,18 +1,18 @@
 const DKG = require('dkg.js');
+require('dotenv').config();
 const {
     PARANET_NODES_ACCESS_POLICY,
     PARANET_MINERS_ACCESS_POLICY
 } = require('dkg.js/constants.js');
 
 let DkgClient = new DKG({
-    environment: '',
-    endpoint: '',
+    environment: process.env.DKG_ENV,
+    endpoint: process.env.RUNTIME_NODE_ENDPOINT,
     port: '8900',
     blockchain: {
         name: 'base:84532',
-        publicKey: '',
-        privateKey:
-            ''
+        publicKey: process.env.PUB_KEY,
+        privateKey: process.env.PRIV_KEY
     },
     maxNumberOfRetries: 30,
     frequency: 2,
@@ -22,14 +22,14 @@ let DkgClient = new DKG({
 let KAContent = {
     public: {
         '@context': ['https://schema.org'],
-        '@id': 'urn:id:paranet:4',
-        paranetName: 'Stable (Staging) Paranet',
-        paranetDescription: 'Stable (Staging) Paranet'
+        '@id': 'urn:id:paranet:5',
+        paranetName: 'Testnet Paranet 5',
+        paranetDescription: 'Testnet Paranet 5'
     }
 };
 
 // Operational wallet public key of the node
-const NODE1_PUBLIC_KEY = '0xbdd9a9bdacb827890c33dff74a69c6866f1022d2';
+const NODE1_PUBLIC_KEY = '0xe7144d3a965b166878212d6c6caf00c0bceab513';
 
 async function createParanet() {
     let KA = await DkgClient.asset.create(KAContent, {
