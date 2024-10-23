@@ -261,16 +261,33 @@ exports.confirmAndCreateAssets = async (req, res) => {
                         if (vectorizationEnabled === 'true') {
                             const UAL = result.UAL;
                             const parsedContent = JSON.parse(content);
-                            const kaForVectorize =
-                                parsedContent.private ||
-                                parsedContent.public ||
-                                parsedContent;
-                            const contentForVectorize = [
-                                {
-                                    ...kaForVectorize,
+
+                            const contentForVectorize = [];
+
+                            if (parsedContent.private) {
+                                contentForVectorize.push({
+                                    ...parsedContent.private,
                                     ual: UAL
-                                }
-                            ];
+                                });
+                            }
+
+                            if (parsedContent.public) {
+                                contentForVectorize.push({
+                                    ...parsedContent.public,
+                                    ual: UAL
+                                });
+                            }
+
+                            if (
+                                !parsedContent.private &&
+                                !parsedContent.public
+                            ) {
+                                contentForVectorize.push({
+                                    ...parsedContent,
+                                    ual: UAL
+                                });
+                            }
+
                             const storageDir = path.join(
                                 __dirname,
                                 '../storage/vector_assets'
