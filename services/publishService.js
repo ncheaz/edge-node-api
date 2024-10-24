@@ -40,6 +40,7 @@ class PublishService {
             case 'internal':
                 return this.internalPublishService(
                     asset,
+                    this.userConfig.edge_node_publish_mode,
                     this.userConfig.edge_node_paranet_ual,
                     wallet
                 );
@@ -48,6 +49,7 @@ class PublishService {
             default:
                 return this.internalPublishService(
                     asset,
+                    this.userConfig.edge_node_publish_mode,
                     this.userConfig.edge_node_paranet_ual,
                     wallet
                 );
@@ -87,11 +89,27 @@ class PublishService {
         }
     }
 
-    async internalPublishService(asset, paranetUAL, wallet = null) {
-        return await this.dkgClient.asset.localStore(asset, {
-            epochsNum: 2,
-            paranetUAL: paranetUAL
-        });
+    async internalPublishService(asset, edgeNodePublishMode, paranetUAL, wallet = null) {
+        switch (edgeNodePublishMode) {
+            case "public":
+                return await this.dkgClient.asset.create(asset, {
+                    epochsNum: 2
+                });
+            case "paranet":
+                return await this.dkgClient.asset.create(asset, {
+                    epochsNum: 2,
+                    paranetUAL: paranetUAL
+                });
+            case "curated_paranet":
+                return await this.dkgClient.asset.localStore(asset, {
+                    epochsNum: 2,
+                    paranetUAL: paranetUAL
+                });
+            default:
+                return await this.dkgClient.asset.create(asset, {
+                    epochsNum: 2
+                });
+        }
     }
 
     definePublishType(endpoint) {

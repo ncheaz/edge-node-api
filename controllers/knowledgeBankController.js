@@ -21,39 +21,77 @@ exports.getDatasets = async (req, res) => {
 
 exports.getAssets = async (req, res) => {
     try {
+        const edgeNodePublishMode = req.user.config.find(
+            item => item.option === 'edge_node_publish_mode'
+        ).value || null;
+        const paranetUAL = req.user.config.find(
+            item => item.option === 'edge_node_paranet_ual'
+        ).value || null;
+
         const offset = parseInt(req.query.offset) || 0;
         const limit = parseInt(req.query.limit) || 10;
 
-        const assets = await internalSequelize.sequelize.query(
-            `WITH RankedAssets AS (SELECT *,
-                                          ROW_NUMBER() OVER (PARTITION BY ual ORDER BY created_at DESC, id DESC) AS row_num
-                                   FROM synced_assets)
+        if(edgeNodePublishMode === 'public') {
+
+            const { count, rows: assets } = await Asset.findAndCountAll({
+                attributes: [
+                    'id',
+                    'ual',
+                    [Sequelize.col('assertion_id'), 'public_assertion_id'],
+                    [Sequelize.col('created_at'), 'backend_synced_at']
+                ],
+                where: {
+                    publishing_status: "COMPLETED"
+                },
+                limit: limit,
+                offset: offset
+            });
+
+
+            res.json({
+                totalItems: count,
+                offset: offset,
+                limit: limit,
+                data: assets
+            });
+        } else {
+            const assets = await internalSequelize.sequelize.query(
+                `WITH RankedAssets AS (
+                SELECT *,
+                       ROW_NUMBER() OVER (PARTITION BY ual ORDER BY created_at DESC, id DESC) AS row_num
+                FROM synced_assets
+                WHERE paranet_ual = :paranetUAL -- Add the filter for paranet_ual
+            )
              SELECT *
              FROM RankedAssets
              WHERE row_num = 1
              ORDER BY created_at DESC, id DESC
                  LIMIT ${limit}
              OFFSET ${offset}`,
-            {
-                type: internalSequelize.Sequelize.QueryTypes.SELECT
-            }
-        );
+                {
+                    type: internalSequelize.Sequelize.QueryTypes.SELECT,
+                    replacements: { paranetUAL }
+                }
+            );
 
-        const total = await internalSequelize.sequelize.query(
-            `select ual, count(*)
-             from synced_assets
-             group by ual`,
-            {
-                type: internalSequelize.Sequelize.QueryTypes.SELECT
-            }
-        );
+            const total = await internalSequelize.sequelize.query(
+                `SELECT ual, COUNT(*)
+             FROM synced_assets
+             WHERE paranet_ual = :paranetUAL -- Add the filter for paranet_ual
+             GROUP BY ual`,
+                {
+                    type: internalSequelize.Sequelize.QueryTypes.SELECT,
+                    replacements: { paranetUAL }
+                }
+            );
 
-        res.json({
-            totalItems: total.length,
-            offset: offset,
-            limit: limit,
-            data: assets
-        });
+            res.json({
+                totalItems: total.length,
+                offset: offset,
+                limit: limit,
+                data: assets
+            });
+        }
     } catch (error) {
         console.error('Error fetching paginated assets:', error);
         res.status(500).json({ error: 'Failed to fetch assets' });
@@ -74,9 +112,15 @@ exports.previewAssetExternal = async (req, res) => {
         const formattedUserConfig = publishService.setUserConfig(userConfig);
 
         const DkgClient = publishService.initDkgClient(blockchain);
-        let result = await DkgClient.asset.get(assetUAL, {
-            paranetUAL: formattedUserConfig.edge_node_paranet_ual
-        });
+        let result;
+        if(formattedUserConfig.edge_node_publish_mode === "public") {
+            result = await DkgClient.asset.get(assetUAL);
+        } else {
+            result = await DkgClient.asset.get(assetUAL, {
+                paranetUAL: formattedUserConfig.edge_node_paranet_ual
+            });
+        }
+
         let formattedKnowledgeAsset = {};
         formattedKnowledgeAsset.private = result.private.assertion;
         formattedKnowledgeAsset.public = result.public.assertion;
@@ -266,7 +310,7 @@ exports.confirmAndCreateAssets = async (req, res) => {
                         if (operationStatus === OPERATION_STATUSES.COMPLETED) {
                             const vectorizationEnabled = req.user.config.find(
                                 item => item.option === 'vectorization_enabled'
-                            ).value;
+                            ).value || null;
                             if (vectorizationEnabled === 'true') {
                                 await vectorService.vectorizeKnowledgeAsset(
                                     result,
