@@ -325,6 +325,11 @@ exports.confirmAndCreateAssets = async (req, res) => {
                             'Something went wrong! Publish data is missing.',
                             wallet
                         );
+                        
+                        return res.status(500).json({
+                            error: 'An error occurred while creating the knowledge asset',
+                            details: 'Failed to store the asset locally.'
+                        });
                     }
                     if (knowledgeAssets.length === 1) {
                         return res.status(200).json({
