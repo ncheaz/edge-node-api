@@ -288,16 +288,11 @@ exports.confirmAndCreateAssets = async (req, res) => {
                         wallet
                     );
                     console.timeEnd('Asset create');
-                    console.log(result);
-                    if (
-                        result &&
-                        result?.operation?.localStore &&
-                        result &&
-                        result?.operation?.submitToParanet
-                    ) {
+                    if ((result?.operation?.localStore && result?.operation?.publish) || (result?.operation?.localStore && result?.operation?.submitToParanet)) {
+
                         const operationStatus = publishService.defineStatus(
                             result.operation.localStore.status,
-                            result.operation.submitToParanet.status
+                            (result?.operation?.publish) ? result.operation.publish.status : result.operation.submitToParanet.status
                         );
                         await publishService.updatePublishingStatus(
                             asset,
@@ -310,7 +305,7 @@ exports.confirmAndCreateAssets = async (req, res) => {
                         if (operationStatus === OPERATION_STATUSES.COMPLETED) {
                             const vectorizationEnabled = req.user.config.find(
                                 item => item.option === 'vectorization_enabled'
-                            ).value || null;
+                            )?.value || null;
                             if (vectorizationEnabled === 'true') {
                                 await vectorService.vectorizeKnowledgeAsset(
                                     result,
