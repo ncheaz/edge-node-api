@@ -29,7 +29,7 @@ let KAContent = {
 };
 
 // Operational wallet public key of the node
-const NODE1_PUBLIC_KEY = '';
+const NODE1_PUBLIC_KEY = process.env.OPERATIONAL_WALLET_PUB_KEY;
 
 async function createParanet() {
     let KA = await DkgClient.asset.create(KAContent, {
