@@ -122,8 +122,7 @@ exports.previewAssetExternal = async (req, res) => {
         }
 
         let formattedKnowledgeAsset = {};
-        formattedKnowledgeAsset.private = result.private.assertion;
-        formattedKnowledgeAsset.public = result.public.assertion;
+        formattedKnowledgeAsset.assertion = result.assertion;
         res.json(formattedKnowledgeAsset);
     } catch (error) {
         console.error('Error fetching asset:', error);

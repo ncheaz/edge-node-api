@@ -99,8 +99,7 @@ class PublishService {
         switch (edgeNodePublishMode) {
             case 'public':
                 return await this.dkgClient.asset.create(asset, {
-                    epochsNum: 2,
-                    tokenAmount: '100000000000'
+                    epochsNum: 2
                 });
             case 'paranet':
                 return await this.dkgClient.asset.create(asset, {
@@ -217,7 +216,8 @@ class PublishService {
 
     defineStatus(localStoreStatus, submitToParanetStatus) {
         if (
-            localStoreStatus === OPERATION_STATUSES.COMPLETED &&
+            (localStoreStatus === OPERATION_STATUSES.COMPLETED ||
+                localStoreStatus === OPERATION_STATUSES.REPLICATE_END) &&
             submitToParanetStatus
         ) {
             return OPERATION_STATUSES.COMPLETED;
