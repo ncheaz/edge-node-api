@@ -26,7 +26,8 @@ class PublishService {
             blockchain: blockchain || this.userConfig.blockchain,
             maxNumberOfRetries: 30,
             frequency: 2,
-            contentType: 'all'
+            contentType: 'all',
+            nodeApiVersion: '/v1'
         });
         return this.dkgClient;
     }
@@ -243,7 +244,8 @@ class PublishService {
 
     defineStatus(localStoreStatus, submitToParanetStatus) {
         if (
-            localStoreStatus === OPERATION_STATUSES.COMPLETED &&
+            (localStoreStatus === OPERATION_STATUSES.COMPLETED ||
+                localStoreStatus === OPERATION_STATUSES.REPLICATE_END) &&
             submitToParanetStatus
         ) {
             return OPERATION_STATUSES.COMPLETED;
