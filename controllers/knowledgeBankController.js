@@ -299,7 +299,7 @@ exports.confirmAndCreateAssets = async (req, res) => {
                             asset,
                             operationStatus,
                             result,
-                            null,
+                            result?.operation?.publish?.errorMessage,
                             wallet
                         );
 
