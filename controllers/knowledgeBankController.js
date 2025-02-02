@@ -231,6 +231,7 @@ exports.importDataset = async (req, res) => {
             assets: finalAssets
         });
     } catch (e) {
+        console.error(e);
         if (inputDatasetDBRecord) {
             await datasetService.updateDatasetProcessingStatus(
                 inputDatasetDBRecord.id,
@@ -292,10 +293,7 @@ exports.confirmAndCreateAssets = async (req, res) => {
                         result?.operation?.submitToParanet
                     ) {
                         const operationStatus = publishService.defineStatus(
-                            result.operation.publish.status,
-                            result?.operation?.publish
-                                ? result.operation.publish.status
-                                : result.operation.submitToParanet.status
+                            result?.operation?.finality?.status
                         );
                         await publishService.updatePublishingStatus(
                             asset,
