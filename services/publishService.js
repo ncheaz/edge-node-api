@@ -214,10 +214,13 @@ class PublishService {
         return null;
     }
 
-    defineStatus(localStoreStatus, submitToParanetStatus) {
+    defineStatus(status, submitToParanetStatus) {
+        if(status && status === "FINALIZED") {
+            return OPERATION_STATUSES.COMPLETED
+        }
         if (
-            (localStoreStatus === OPERATION_STATUSES.COMPLETED ||
-                localStoreStatus === OPERATION_STATUSES.REPLICATE_END) &&
+            (status === OPERATION_STATUSES.COMPLETED ||
+                status === OPERATION_STATUSES.REPLICATE_END) &&
             submitToParanetStatus
         ) {
             return OPERATION_STATUSES.COMPLETED;
