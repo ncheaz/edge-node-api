@@ -341,11 +341,9 @@ exports.confirmAndCreateAssets = async (req, res) => {
                                 UAL: result.UAL,
                                 assertionId: result.publicAssertionId,
                                 transactionHash:
-                                    result?.operation?.mintKnowledgeAsset
-                                        .transactionHash,
+                                    result?.operation?.mintKnowledgeAsset?.transactionHash,
                                 status: publishService.defineStatus(
-                                    result.operation.publish.status,
-                                    result.operation.submitToParanet?.status
+                                    result?.operation?.finality?.status
                                 )
                             }
                         });
