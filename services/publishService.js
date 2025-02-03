@@ -99,7 +99,9 @@ class PublishService {
         switch (edgeNodePublishMode) {
             case 'public':
                 return await this.dkgClient.asset.create(asset, {
-                    epochsNum: 2
+                    epochsNum: 2,
+                    minimumNumberOfFinalizationConfirmations: 1,
+                    minimumNumberOfNodeReplications: 3
                 });
             case 'paranet':
                 return await this.dkgClient.asset.create(asset, {
