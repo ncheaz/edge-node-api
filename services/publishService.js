@@ -101,7 +101,7 @@ class PublishService {
                 return await this.dkgClient.asset.create(asset, {
                     epochsNum: 2,
                     minimumNumberOfFinalizationConfirmations: 1,
-                    minimumNumberOfNodeReplications: 3
+                    minimumNumberOfNodeReplications: 1
                 });
             case 'paranet':
                 return await this.dkgClient.asset.create(asset, {
@@ -115,7 +115,9 @@ class PublishService {
                 });
             default:
                 return await this.dkgClient.asset.create(asset, {
-                    epochsNum: 2
+                    epochsNum: 2,
+                    minimumNumberOfFinalizationConfirmations: 1,
+                    minimumNumberOfNodeReplications: 1
                 });
         }
     }
