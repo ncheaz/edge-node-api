@@ -102,7 +102,7 @@ class PublishService {
                     epochsNum: 2,
                     minimumNumberOfFinalizationConfirmations: 1,
                     minimumNumberOfNodeReplications: 1,
-                    localStore: true,
+                    localStore: false,
                 });
             case 'paranet':
                 return await this.dkgClient.asset.create(asset, {
