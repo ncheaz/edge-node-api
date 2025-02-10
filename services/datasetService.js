@@ -21,7 +21,8 @@ exports.storeInputDataset = async (relativePath, filename) => {
 
 exports.storeStagedAssetsToStorage = async (
     stagedKnowledgeAssets,
-    inputDatasetDBRecord
+    inputDatasetDBRecord,
+    publishMode = 'public'
 ) => {
     let filenames = [];
     let inputStagedAssets = [];
@@ -38,7 +39,12 @@ exports.storeStagedAssetsToStorage = async (
     for (let index = 0; index < inputStagedAssets.length; index++) {
         const row = inputStagedAssets[index];
         let transformedToPrivateAsset = {};
-        transformedToPrivateAsset.private = row;
+        if(publishMode !== 'public') {
+            transformedToPrivateAsset.private = row;
+        } else {
+            transformedToPrivateAsset.public = row;
+        }
+        
         const filename = `KA-OUTPUT-${index + 1}-FROM-FILE-${inputDatasetDBRecord.filename.replace('.json', '').replace('.pdf', '')}.json`;
         const filepath = path.join(__dirname, '../storage/assets', filename);
         const relativeFilePath = `/storage/assets/${filename}`;

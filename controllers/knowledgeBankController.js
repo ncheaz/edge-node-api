@@ -192,6 +192,10 @@ exports.importDataset = async (req, res) => {
         const kMiningEndpoint = req.user.config.find(
             item => item.option === 'kmining_endpoint'
         ).value;
+        const publishMode = req.user.config.find(
+            item => item.option === 'edge_node_publish_mode'
+        ).value;
+
         const kMiningPipelineId =
             await kMiningService.defineProcessingPipelineId(req);
         console.timeEnd('Store input dataset and prepare KMining request');
@@ -210,7 +214,8 @@ exports.importDataset = async (req, res) => {
         let { filenames, assetsData } =
             await datasetService.storeStagedAssetsToStorage(
                 stagedKnowledgeAssets,
-                inputDatasetDBRecord
+                inputDatasetDBRecord,
+                publishMode
             );
         let { errors, finalAssets } =
             await datasetService.storeStagedAssetsToDB(
