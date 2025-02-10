@@ -101,7 +101,8 @@ class PublishService {
                 return await this.dkgClient.asset.create(asset, {
                     epochsNum: 2,
                     minimumNumberOfFinalizationConfirmations: 1,
-                    minimumNumberOfNodeReplications: 1
+                    minimumNumberOfNodeReplications: 1,
+                    localStore: true,
                 });
             case 'paranet':
                 return await this.dkgClient.asset.create(asset, {
@@ -117,7 +118,8 @@ class PublishService {
                 return await this.dkgClient.asset.create(asset, {
                     epochsNum: 2,
                     minimumNumberOfFinalizationConfirmations: 1,
-                    minimumNumberOfNodeReplications: 1
+                    minimumNumberOfNodeReplications: 1,
+                    localStore: true,
                 });
         }
     }
