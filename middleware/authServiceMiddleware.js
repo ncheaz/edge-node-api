@@ -16,7 +16,7 @@ exports.authMiddleware = async (req, res, next) => {
 
         // Make a request to the Auth service to verify the session
         const authResponse = await axios.get(
-            `${process.env.AUTH_SERVICE_ENDPOINT}/auth/check`,
+            `${process.env.AUTH_SERVICE_ENDPOINT}/check`,
             {
                 headers: {
                     Cookie: sessionCookie // Forward the session cookie to the Auth service
