@@ -132,7 +132,7 @@ class PublishService {
 
     async getWallets(sessionCookie) {
         const wallets = await axios.get(
-            `${process.env.AUTH_SERVICE_ENDPOINT}/auth/wallets`,
+            `${process.env.AUTH_SERVICE_ENDPOINT}/wallets`,
             {
                 headers: {
                     Cookie: sessionCookie
