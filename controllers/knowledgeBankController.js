@@ -102,9 +102,9 @@ exports.previewAssetExternal = async (req, res) => {
     const { assetUAL } = req.query;
 
     try {
-        const sessionCookie = req.headers.cookie;
+        // const sessionCookie = req.headers.cookie;
         //todo: This part is not needed, we should define blockchain based on passed ual. We should refactor it after v1
-        let wallets = await publishService.getWallets(sessionCookie);
+        let wallets = await publishService.getWallets(req);
         const wallet = await publishService.defineNextWallet(wallets);
         let blockchain = publishService.defineBlockchainSettings(wallet);
 
@@ -202,6 +202,7 @@ exports.importDataset = async (req, res) => {
 
         console.time('K Mining pipeline');
         const stagedKnowledgeAssets = await kMiningService.triggerPipeline(
+            req,
             req.file,
             sessionCookie,
             kMiningEndpoint,
@@ -254,8 +255,8 @@ exports.confirmAndCreateAssets = async (req, res) => {
     try {
         console.time('Prepare config');
         const { knowledgeAssets } = req.body;
-        const sessionCookie = req.headers.cookie;
-        let wallets = await publishService.getWallets(sessionCookie);
+        // const sessionCookie = req.headers.cookie;
+        let wallets = await publishService.getWallets(req);
         const userConfig = req.user.config;
         publishService.setUserConfig(userConfig);
         console.timeEnd('Prepare config');
@@ -346,7 +347,8 @@ exports.confirmAndCreateAssets = async (req, res) => {
                                 UAL: result.UAL,
                                 assertionId: result.publicAssertionId,
                                 transactionHash:
-                                    result?.operation?.mintKnowledgeAsset?.transactionHash,
+                                    result?.operation?.mintKnowledgeAsset
+                                        ?.transactionHash,
                                 status: publishService.defineStatus(
                                     result?.operation?.finality?.status
                                 )

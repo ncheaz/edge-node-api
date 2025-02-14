@@ -102,7 +102,7 @@ class PublishService {
                     epochsNum: 2,
                     minimumNumberOfFinalizationConfirmations: 1,
                     minimumNumberOfNodeReplications: 1,
-                    localStore: false,
+                    localStore: false
                 });
             case 'paranet':
                 return await this.dkgClient.asset.create(asset, {
@@ -119,7 +119,7 @@ class PublishService {
                     epochsNum: 2,
                     minimumNumberOfFinalizationConfirmations: 1,
                     minimumNumberOfNodeReplications: 1,
-                    localStore: true,
+                    localStore: true
                 });
         }
     }
@@ -132,17 +132,45 @@ class PublishService {
         return 'internal';
     }
 
-    async getWallets(sessionCookie) {
-        const wallets = await axios.get(
-            `${process.env.AUTH_SERVICE_ENDPOINT}/wallets`,
-            {
-                headers: {
-                    Cookie: sessionCookie
-                },
-                withCredentials: true
+    async getWallets(req) {
+        try {
+            const authHeader = req.headers['authorization'];
+
+            if (authHeader && authHeader.startsWith('Bearer ')) {
+                // Bearer token is present
+                const token = authHeader.split(' ')[1];
+
+                if (!token) {
+                    throw Error('Invalid token format');
+                }
+
+                const wallets = await axios.get(
+                    `${process.env.AUTH_SERVICE_ENDPOINT}/wallets`,
+                    {
+                        headers: {
+                            Authorization: `Bearer ${token}`
+                        },
+                        withCredentials: true
+                    }
+                );
+                return wallets.data.wallets;
+            } else {
+                const sessionCookie = req.headers.cookie;
+
+                const wallets = await axios.get(
+                    `${process.env.AUTH_SERVICE_ENDPOINT}/wallets`,
+                    {
+                        headers: {
+                            Cookie: sessionCookie
+                        },
+                        withCredentials: true
+                    }
+                );
+                return wallets.data.wallets;
             }
-        );
-        return wallets.data.wallets;
+        } catch (e) {
+            return null;
+        }
     }
 
     async defineNextWallet(wallets) {
@@ -221,8 +249,8 @@ class PublishService {
     }
 
     defineStatus(status, submitToParanetStatus) {
-        if(status && status === "FINALIZED") {
-            return OPERATION_STATUSES.COMPLETED
+        if (status && status === 'FINALIZED') {
+            return OPERATION_STATUSES.COMPLETED;
         }
         if (
             (status === OPERATION_STATUSES.COMPLETED ||
