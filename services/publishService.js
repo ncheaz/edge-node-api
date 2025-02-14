@@ -132,7 +132,7 @@ class PublishService {
         return 'internal';
     }
 
-    async getWallets(sessionCookie) {
+    async getWallets(req) {
         try {
             const authHeader = req.headers['authorization'];
 
