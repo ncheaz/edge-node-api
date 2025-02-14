@@ -99,7 +99,10 @@ class PublishService {
         switch (edgeNodePublishMode) {
             case 'public':
                 return await this.dkgClient.asset.create(asset, {
-                    epochsNum: 2
+                    epochsNum: 2,
+                    minimumNumberOfFinalizationConfirmations: 1,
+                    minimumNumberOfNodeReplications: 1,
+                    localStore: false,
                 });
             case 'paranet':
                 return await this.dkgClient.asset.create(asset, {
@@ -113,7 +116,10 @@ class PublishService {
                 });
             default:
                 return await this.dkgClient.asset.create(asset, {
-                    epochsNum: 2
+                    epochsNum: 2,
+                    minimumNumberOfFinalizationConfirmations: 1,
+                    minimumNumberOfNodeReplications: 1,
+                    localStore: true,
                 });
         }
     }
@@ -242,10 +248,13 @@ class PublishService {
         return null;
     }
 
-    defineStatus(localStoreStatus, submitToParanetStatus) {
+    defineStatus(status, submitToParanetStatus) {
+        if(status && status === "FINALIZED") {
+            return OPERATION_STATUSES.COMPLETED
+        }
         if (
-            (localStoreStatus === OPERATION_STATUSES.COMPLETED ||
-                localStoreStatus === OPERATION_STATUSES.REPLICATE_END) &&
+            (status === OPERATION_STATUSES.COMPLETED ||
+                status === OPERATION_STATUSES.REPLICATE_END) &&
             submitToParanetStatus
         ) {
             return OPERATION_STATUSES.COMPLETED;

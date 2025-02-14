@@ -192,6 +192,10 @@ exports.importDataset = async (req, res) => {
         const kMiningEndpoint = req.user.config.find(
             item => item.option === 'kmining_endpoint'
         ).value;
+        const publishMode = req.user.config.find(
+            item => item.option === 'edge_node_publish_mode'
+        ).value;
+
         const kMiningPipelineId =
             await kMiningService.defineProcessingPipelineId(req);
         console.timeEnd('Store input dataset and prepare KMining request');
@@ -210,7 +214,8 @@ exports.importDataset = async (req, res) => {
         let { filenames, assetsData } =
             await datasetService.storeStagedAssetsToStorage(
                 stagedKnowledgeAssets,
-                inputDatasetDBRecord
+                inputDatasetDBRecord,
+                publishMode
             );
         let { errors, finalAssets } =
             await datasetService.storeStagedAssetsToDB(
@@ -231,6 +236,7 @@ exports.importDataset = async (req, res) => {
             assets: finalAssets
         });
     } catch (e) {
+        console.error(e);
         if (inputDatasetDBRecord) {
             await datasetService.updateDatasetProcessingStatus(
                 inputDatasetDBRecord.id,
@@ -292,16 +298,13 @@ exports.confirmAndCreateAssets = async (req, res) => {
                         result?.operation?.submitToParanet
                     ) {
                         const operationStatus = publishService.defineStatus(
-                            result.operation.publish.status,
-                            result?.operation?.publish
-                                ? result.operation.publish.status
-                                : result.operation.submitToParanet.status
+                            result?.operation?.finality?.status
                         );
                         await publishService.updatePublishingStatus(
                             asset,
                             operationStatus,
                             result,
-                            null,
+                            result?.operation?.publish?.errorMessage,
                             wallet
                         );
 
@@ -343,11 +346,9 @@ exports.confirmAndCreateAssets = async (req, res) => {
                                 UAL: result.UAL,
                                 assertionId: result.publicAssertionId,
                                 transactionHash:
-                                    result?.operation?.mintKnowledgeAsset
-                                        .transactionHash,
+                                    result?.operation?.mintKnowledgeAsset?.transactionHash,
                                 status: publishService.defineStatus(
-                                    result.operation.publish.status,
-                                    result.operation.submitToParanet?.status
+                                    result?.operation?.finality?.status
                                 )
                             }
                         });
