@@ -29,6 +29,7 @@ exports.defineProcessingPipelineId = async req => {
 };
 
 exports.triggerPipeline = async (
+    req,
     file,
     sessionCookie,
     kMiningEndpoint,

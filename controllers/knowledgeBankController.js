@@ -202,6 +202,7 @@ exports.importDataset = async (req, res) => {
 
         console.time('K Mining pipeline');
         const stagedKnowledgeAssets = await kMiningService.triggerPipeline(
+            req,
             req.file,
             sessionCookie,
             kMiningEndpoint,
@@ -346,7 +347,8 @@ exports.confirmAndCreateAssets = async (req, res) => {
                                 UAL: result.UAL,
                                 assertionId: result.publicAssertionId,
                                 transactionHash:
-                                    result?.operation?.mintKnowledgeAsset?.transactionHash,
+                                    result?.operation?.mintKnowledgeAsset
+                                        ?.transactionHash,
                                 status: publishService.defineStatus(
                                     result?.operation?.finality?.status
                                 )
