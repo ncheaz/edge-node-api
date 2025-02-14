@@ -16,7 +16,7 @@ exports.authMiddleware = async (req, res, next) => {
             }
 
             const authResponse = await axios.get(
-                `${process.env.AUTH_SERVICE_ENDPOINT}/auth/check`,
+                `${process.env.AUTH_SERVICE_ENDPOINT}/check`,
                 {
                     headers: {
                         Authorization: `Bearer ${token}`
@@ -46,7 +46,7 @@ exports.authMiddleware = async (req, res, next) => {
             }
 
             const authResponse = await axios.get(
-                `${process.env.AUTH_SERVICE_ENDPOINT}/auth/check`,
+                `${process.env.AUTH_SERVICE_ENDPOINT}/check`,
                 {
                     headers: {
                         Cookie: sessionCookie

@@ -102,7 +102,7 @@ class PublishService {
                     epochsNum: 2,
                     minimumNumberOfFinalizationConfirmations: 1,
                     minimumNumberOfNodeReplications: 1,
-                    localStore: false,
+                    localStore: false
                 });
             case 'paranet':
                 return await this.dkgClient.asset.create(asset, {
@@ -119,7 +119,7 @@ class PublishService {
                     epochsNum: 2,
                     minimumNumberOfFinalizationConfirmations: 1,
                     minimumNumberOfNodeReplications: 1,
-                    localStore: true,
+                    localStore: true
                 });
         }
     }
@@ -145,7 +145,7 @@ class PublishService {
                 }
 
                 const wallets = await axios.get(
-                    `${process.env.AUTH_SERVICE_ENDPOINT}/auth/wallets`,
+                    `${process.env.AUTH_SERVICE_ENDPOINT}/wallets`,
                     {
                         headers: {
                             Authorization: `Bearer ${token}`
@@ -158,7 +158,7 @@ class PublishService {
                 const sessionCookie = req.headers.cookie;
 
                 const wallets = await axios.get(
-                    `${process.env.AUTH_SERVICE_ENDPOINT}/auth/wallets`,
+                    `${process.env.AUTH_SERVICE_ENDPOINT}/wallets`,
                     {
                         headers: {
                             Cookie: sessionCookie
@@ -249,8 +249,8 @@ class PublishService {
     }
 
     defineStatus(status, submitToParanetStatus) {
-        if(status && status === "FINALIZED") {
-            return OPERATION_STATUSES.COMPLETED
+        if (status && status === 'FINALIZED') {
+            return OPERATION_STATUSES.COMPLETED;
         }
         if (
             (status === OPERATION_STATUSES.COMPLETED ||
