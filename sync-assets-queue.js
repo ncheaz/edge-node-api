@@ -6,6 +6,11 @@ const { Queue, Worker } = require('bullmq');
 const redis = require('ioredis');
 const axios = require('axios');
 const connection = new redis({
+    port: process.env.REDIS_PORT,
+    host: process.env.REDIS_HOST,
+    username: process.env.REDIS_USERNAME,
+    password: process.env.REDIS_PASSWORD,
+    db: process.env.REDIS_DB,
     maxRetriesPerRequest: null
 });
 

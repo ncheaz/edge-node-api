@@ -5,6 +5,11 @@ require('./queue-metrics');
 
 // Create the Redis connection
 const connection = new redis({
+    port: process.env.REDIS_PORT,
+    host: process.env.REDIS_HOST,
+    username: process.env.REDIS_USERNAME,
+    password: process.env.REDIS_PASSWORD,
+    db: process.env.REDIS_DB,
     maxRetriesPerRequest: null
 });
 
@@ -18,7 +23,7 @@ async function createAssetJob(wallet, assetContent) {
         // Create a worker for this wallet's queue
         new Worker(
             `wallet-jobs-${wallet}`,
-            async (job) => {
+            async job => {
                 const { wallet } = job.data;
                 await createKnowledgeAsset(wallet, assetContent);
             },
