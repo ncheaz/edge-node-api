@@ -17,7 +17,7 @@
       4. GRANT ALL PRIVILEGES ON*.*TO'username'@'%'WITH GRANT OPTION;
       5. FLUSH PRIVILEGES;
       6. update Edge node API .env with mysql connection details
-6. make sure redis is running on it's default port 6379
+6. make sure redis is running as configured in .env (default: 127.0.0.1:6379)
 7. npm run start
 
 ## Dependencies
