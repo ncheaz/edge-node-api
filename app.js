@@ -3,6 +3,7 @@ require('dotenv').config();
 const express = require('express');
 // const { createAssetJob } = require('./queue');
 require('./sync-assets-queue');
+require('./retry-publish-queue');
 const cors = require('cors');
 const cookieParser = require('cookie-parser');
 const app = express();
@@ -46,6 +47,9 @@ router.use('/dashboard', dashboardRoutes);
 router.use('/knowledge-bank', knowledgeBankRoutes);
 router.use('/notifications', notificationRoutes);
 app.use(process.env.ROUTES_PREFIX || '/', router);
+
+const bullBoard = require('./bull-board');
+app.use(bullBoard.basePath, bullBoard.router);
 
 const server = app.listen(port, () => {
     console.log(`Edge node backend running on port ${port}`);

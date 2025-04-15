@@ -5,6 +5,20 @@ const https = require('https');
 const axios = require('axios');
 const DKG = require('dkg.js');
 const { OPERATION_STATUSES } = require('../helpers/utils');
+const {
+    Queue,
+    QueueEvents,
+    Worker,
+    Job,
+    UnrecoverableError
+} = require('bullmq');
+const redis = require('ioredis');
+const bullBoard = require('../bull-board');
+const { BullMQOtel } = require('bullmq-otel');
+
+const publishQueueConnection = new redis({
+    maxRetriesPerRequest: null
+});
 
 class PublishService {
     constructor() {
@@ -31,6 +45,94 @@ class PublishService {
         });
         return this.dkgClient;
     }
+
+    publishQueue = {
+        _queues: {},
+        _queueEvents: {},
+        _actions: {},
+        createQueryKey(wallet) {
+            return `wallet-jobs-${wallet.wallet}-${wallet.blockchain?.replace(
+                ':',
+                ''
+            )}`;
+        },
+        async addJobForWallet(wallet, action) {
+            const qKey = this.createQueryKey(wallet);
+            const actionId = `${qKey}__${Math.random()}`;
+
+            if (!this._queues[qKey]) {
+                // Initialize queue for the wallet
+                this._queues[qKey] = new Queue(qKey, {
+                    connection: publishQueueConnection,
+                    telemetry: new BullMQOtel('publish-service', '0.0.1')
+                });
+                this._queueEvents[qKey] = new QueueEvents(qKey);
+
+                // Create a worker for this wallet's queue
+                new Worker(
+                    qKey,
+                    async ({ data }) => {
+                        console.log('Running action:', data.actionId);
+                        if (this._actions[data.actionId])
+                            return await this._actions[data.actionId]();
+                        else
+                            throw new UnrecoverableError(
+                                'Unexpected error - no job action.'
+                            );
+                    },
+                    {
+                        connection: publishQueueConnection,
+                        concurrency: 1, // important!
+                        telemetry: new BullMQOtel('publish-service', '0.0.1')
+                    }
+                );
+
+                // Add to bull-board UI
+                bullBoard.addQueue(this._queues[qKey]);
+            }
+
+            //add job to the queue
+            this._actions[actionId] = action;
+            return await this._queues[qKey].add(
+                actionId,
+                { actionId },
+                {
+                    removeOnComplete: true,
+                    removeOnFail: true,
+                    attempts: 10,
+                    backoff: 1000
+                }
+            );
+        },
+        getQueueEvents(wallet) {
+            const qKey = this.createQueryKey(wallet);
+            return this._queueEvents[qKey];
+        },
+        _walletsUseCount: {},
+        walletNextOptimal(availableWallets) {
+            const optimal_qKey = Object.entries(this._walletsUseCount)
+                .sort((a, b) => a[1] - b[1])
+                .at(0)?.[0];
+
+            let optimal_wallet = availableWallets[0];
+            for (let i = 0; i < availableWallets.length; i++) {
+                const qKey = this.createQueryKey(availableWallets[i]);
+                if (!this._walletsUseCount[qKey]) return availableWallets[i];
+                if (qKey === optimal_qKey) optimal_wallet = availableWallets[i];
+            }
+            return optimal_wallet;
+        },
+        walletMarkUsed(wallet) {
+            const qKey = this.createQueryKey(wallet);
+            if (qKey in this._walletsUseCount) this._walletsUseCount[qKey]++;
+            else this._walletsUseCount[qKey] = 1;
+        },
+        jobCleanup(job) {
+            const qKey = job.data.actionId.split('__')[0];
+            if (qKey in this._walletsUseCount) this._walletsUseCount[qKey]--;
+            delete this._actions[job.data.actionId];
+        }
+    };
 
     async createAsset(endpoint, asset, wallet = null) {
         let type = this.definePublishType(endpoint);
@@ -97,30 +199,151 @@ class PublishService {
         wallet = null
     ) {
         switch (edgeNodePublishMode) {
-            case 'public':
-                return await this.dkgClient.asset.create(asset, {
-                    epochsNum: 2,
-                    minimumNumberOfFinalizationConfirmations: 1,
-                    minimumNumberOfNodeReplications: 1,
-                    localStore: false
-                });
             case 'paranet':
-                return await this.dkgClient.asset.create(asset, {
-                    epochsNum: 2,
-                    paranetUAL: paranetUAL
-                });
+                const paranetJob = await this.publishQueue.addJobForWallet(
+                    wallet,
+                    () =>
+                        this.initDkgClient(
+                            this.defineBlockchainSettings(wallet)
+                        ).asset.create(asset, {
+                            epochsNum: 2,
+                            paranetUAL,
+                            minimumNumberOfFinalizationConfirmations: 1,
+                            minimumNumberOfNodeReplications: 1
+                        })
+                );
+
+                try {
+                    console.time(
+                        `[${this.publishQueue.createQueryKey(wallet)}] #${
+                            paranetJob.id
+                        }`
+                    );
+                    const paranetResult = await paranetJob.waitUntilFinished(
+                        this.publishQueue.getQueueEvents(wallet)
+                    );
+                    console.timeEnd(
+                        `[${this.publishQueue.createQueryKey(wallet)}] #${
+                            paranetJob.id
+                        }`
+                    );
+                    this.publishQueue.jobCleanup(paranetJob);
+                    return paranetResult;
+                } catch (error) {
+                    console.timeEnd(
+                        `[${this.publishQueue.createQueryKey(wallet)}] #${
+                            paranetJob.id
+                        }`
+                    );
+                    throw error;
+                }
             case 'curated_paranet':
-                return await this.dkgClient.asset.localStore(asset, {
-                    epochsNum: 2,
-                    paranetUAL: paranetUAL
-                });
+                const curatedJob = await this.publishQueue.addJobForWallet(
+                    wallet,
+                    () =>
+                        this.initDkgClient(
+                            this.defineBlockchainSettings(wallet)
+                        ).asset.create(asset, {
+                            epochsNum: 2,
+                            minimumNumberOfFinalizationConfirmations: 1,
+                            minimumNumberOfNodeReplications: 1
+                        })
+                );
+
+                try {
+                    console.time(
+                        `[${this.publishQueue.createQueryKey(wallet)}] #${
+                            curatedJob.id
+                        }`
+                    );
+                    const curatedResult = await curatedJob.waitUntilFinished(
+                        this.publishQueue.getQueueEvents(wallet)
+                    );
+                    console.timeEnd(
+                        `[${this.publishQueue.createQueryKey(wallet)}] #${
+                            curatedJob.id
+                        }`
+                    );
+                    this.publishQueue.jobCleanup(curatedJob);
+
+                    // Result will be returned as is, submitToParanet will be handled separately in the controller
+                    return curatedResult;
+                } catch (error) {
+                    console.timeEnd(
+                        `[${this.publishQueue.createQueryKey(wallet)}] #${
+                            curatedJob.id
+                        }`
+                    );
+                    throw error;
+                }
             default:
-                return await this.dkgClient.asset.create(asset, {
-                    epochsNum: 2,
-                    minimumNumberOfFinalizationConfirmations: 1,
-                    minimumNumberOfNodeReplications: 1,
-                    localStore: true
-                });
+                const defaultJob = await this.publishQueue.addJobForWallet(
+                    wallet,
+                    () =>
+                        this.initDkgClient(
+                            this.defineBlockchainSettings(wallet)
+                        ).asset.create(asset, {
+                            epochsNum: 2,
+                            minimumNumberOfFinalizationConfirmations: 1,
+                            minimumNumberOfNodeReplications: 1
+                        })
+                );
+
+                try {
+                    console.time(
+                        `[${this.publishQueue.createQueryKey(wallet)}] #${
+                            defaultJob.id
+                        }`
+                    );
+                    const defaultResult = await defaultJob.waitUntilFinished(
+                        this.publishQueue.getQueueEvents(wallet)
+                    );
+                    console.timeEnd(
+                        `[${this.publishQueue.createQueryKey(wallet)}] #${
+                            defaultJob.id
+                        }`
+                    );
+                    this.publishQueue.jobCleanup(defaultJob);
+                    return defaultResult;
+                } catch (error) {
+                    console.timeEnd(
+                        `[${this.publishQueue.createQueryKey(wallet)}] #${
+                            defaultJob.id
+                        }`
+                    );
+                    throw error;
+                }
+        }
+    }
+
+    async submitToParanet(UAL, wallet) {
+        const job = await this.publishQueue.addJobForWallet(wallet, () =>
+            this.initDkgClient(this.defineBlockchainSettings(wallet))
+                .asset.submitToParanet(
+                    UAL,
+                    this.userConfig.edge_node_paranet_ual
+                )
+                .then(r => r.operation)
+                .catch(() => undefined)
+        );
+
+        try {
+            console.time(
+                `[${this.publishQueue.createQueryKey(wallet)}] #${job.id}`
+            );
+            const receipt = await job.waitUntilFinished(
+                this.publishQueue.getQueueEvents(wallet)
+            );
+            console.timeEnd(
+                `[${this.publishQueue.createQueryKey(wallet)}] #${job.id}`
+            );
+            this.publishQueue.jobCleanup(job);
+            return receipt;
+        } catch (error) {
+            console.timeEnd(
+                `[${this.publishQueue.createQueryKey(wallet)}] #${job.id}`
+            );
+            throw error;
         }
     }
 
