@@ -9,6 +9,9 @@ const vectorService = require('../services/vectorService.js');
 const { Op, Sequelize } = require('sequelize');
 const internalSequelize = require('../models/index');
 const milvusService = require('../services/milvusService.js');
+const redis = require('ioredis');
+const { Queue, Worker } = require('bullmq');
+const { BullMQOtel } = require('bullmq-otel');
 
 exports.getDatasets = async (req, res) => {
     try {
