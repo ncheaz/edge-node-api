@@ -1,4 +1,7 @@
 require('dotenv').config();
+if (process.env.OTEL_ENABLED?.toLowerCase() === 'true') {
+    require('@opentelemetry/auto-instrumentations-node/register');
+}
 
 const express = require('express');
 // const { createAssetJob } = require('./queue');
@@ -41,9 +44,11 @@ const dashboardRoutes = require('./routes/dashboard');
 const knowledgeBankRoutes = require('./routes/knowledgeBank');
 const notificationRoutes = require('./routes/notifications');
 
-app.use('/dashboard', dashboardRoutes);
-app.use('/knowledge-bank', knowledgeBankRoutes);
-app.use('/notifications', notificationRoutes);
+const router = express.Router();
+router.use('/dashboard', dashboardRoutes);
+router.use('/knowledge-bank', knowledgeBankRoutes);
+router.use('/notifications', notificationRoutes);
+app.use(process.env.ROUTES_PREFIX || '/', router);
 
 const server = app.listen(port, () => {
     console.log(`Edge node backend running on port ${port}`);

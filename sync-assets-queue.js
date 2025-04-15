@@ -3,9 +3,15 @@ const { QueryTypes } = require('sequelize');
 const sequelize = require('sequelize');
 const { SyncedAsset, Notification } = require('./models');
 const { Queue, Worker } = require('bullmq');
+const { BullMQOtel } = require('bullmq-otel');
 const redis = require('ioredis');
 const axios = require('axios');
 const connection = new redis({
+    port: process.env.REDIS_PORT,
+    host: process.env.REDIS_HOST,
+    username: process.env.REDIS_USERNAME,
+    password: process.env.REDIS_PASSWORD,
+    db: process.env.REDIS_DB,
     maxRetriesPerRequest: null
 });
 
@@ -13,7 +19,10 @@ const mockWait = ms => {
     return new Promise(resolve => setTimeout(resolve, ms));
 };
 
-const syncQueue = new Queue('syncQueue', { connection });
+const syncQueue = new Queue('syncQueue', {
+    connection,
+    telemetry: new BullMQOtel('sync-assets-queue')
+});
 
 new Worker(
     'syncQueue',
@@ -92,7 +101,8 @@ new Worker(
     },
     {
         connection,
-        concurrency: 1 // Ensure only one job runs at a time
+        concurrency: 1, // Ensure only one job runs at a time
+        telemetry: new BullMQOtel('sync-assets-queue')
     }
 );
 
