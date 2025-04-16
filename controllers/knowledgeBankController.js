@@ -177,6 +177,7 @@ exports.importDataset = async (req, res) => {
     try {
         console.time('Store input dataset and prepare KMining request');
         if (!req.file) {
+            if (req.datasetIdCb) req.datasetIdCb(null);
             return res.status(400).send('No file uploaded.');
         }
         const sessionCookie = req.headers.cookie;
@@ -187,6 +188,8 @@ exports.importDataset = async (req, res) => {
             relativePath,
             req.file.filename
         );
+        if (req.datasetIdCb) req.datasetIdCb(inputDatasetDBRecord.id);
+
         await datasetService.updateDatasetProcessingStatus(
             inputDatasetDBRecord.id,
             OPERATION_STATUSES['IN-PROGRESS']
@@ -242,6 +245,7 @@ exports.importDataset = async (req, res) => {
     } catch (e) {
         console.error(e);
         if (inputDatasetDBRecord) {
+            if (req.datasetIdCb) req.datasetIdCb(inputDatasetDBRecord.id);
             await datasetService.updateDatasetProcessingStatus(
                 inputDatasetDBRecord.id,
                 OPERATION_STATUSES.FAILED,
