@@ -28,6 +28,25 @@ exports.defineProcessingPipelineId = async req => {
     }
 };
 
+async function inferMimeType(filePath) {
+    const f = await fs.promises.open(filePath);
+    const peek = Buffer.alloc(256);
+    await f.read(peek, 0, 256);
+    f.close();
+    if (peek.indexOf('{') === 0 || peek.indexOf('[') === 0) {
+        return peek.includes('"@context"') || peek.includes('"@type"')
+            ? 'application/ld+json'
+            : 'application/json';
+    }
+    if (peek.indexOf('%PDF') === 0) {
+        return 'application/pdf';
+    }
+    if (peek.includes(',')) {
+        return 'text/csv';
+    }
+    return 'text/plain';
+}
+
 exports.triggerPipeline = async (
     req,
     file,
@@ -40,6 +59,15 @@ exports.triggerPipeline = async (
         // Create form data
         const formData = new FormData();
         const filePath = file.path;
+
+        if (
+            !file.mimetype ||
+            file.mimetype === 'text/plain' ||
+            file.mimetype === 'application/json'
+        ) {
+            file.mimetype = await inferMimeType(filePath);
+        }
+
         formData.append('file', fs.createReadStream(filePath));
         formData.append('pipelineId', kMiningPipelineId);
         formData.append(
