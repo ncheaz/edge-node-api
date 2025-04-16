@@ -9,9 +9,10 @@ serverAdapter.setBasePath(basePath);
 
 const board = createBullBoard({
     queues: [],
-    serverAdapter,
+    serverAdapter
 });
 
-exports.addQueue = (q) => board.addQueue(new BullMQAdapter(q, { readOnlyMode: true }));
+exports.addQueue = q =>
+    board.addQueue(new BullMQAdapter(q, { readOnlyMode: true }));
 exports.basePath = basePath;
 exports.router = serverAdapter.getRouter();

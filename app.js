@@ -49,10 +49,11 @@ const router = express.Router();
 router.use('/dashboard', dashboardRoutes);
 router.use('/knowledge-bank', knowledgeBankRoutes);
 router.use('/notifications', notificationRoutes);
-app.use(process.env.ROUTES_PREFIX || '/', router);
 
 const bullBoard = require('./bull-board');
-app.use(bullBoard.basePath, bullBoard.router);
+router.use(bullBoard.basePath, bullBoard.router);
+
+app.use(process.env.ROUTES_PREFIX || '/', router);
 
 const server = app.listen(port, () => {
     console.log(`Edge node backend running on port ${port}`);
