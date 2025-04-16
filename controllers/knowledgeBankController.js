@@ -321,32 +321,6 @@ exports.confirmAndCreateAssets = async (req, res) => {
                         ? OPERATION_STATUSES.COMPLETED
                         : OPERATION_STATUSES.FAILED;
 
-                    // For curated_paranet mode, submit to paranet if asset creation is successful
-                    if (
-                        publishStatus === OPERATION_STATUSES.COMPLETED &&
-                        edgeNodePublishMode === 'curated_paranet' &&
-                        paranetUAL
-                    ) {
-                        console.time(
-                            `[${asset.dataset_id}_${
-                                i + 1
-                            }] Asset submitToParanet`
-                        );
-                        const submitToParanetResult =
-                            await publishService.submitToParanet(
-                                result.UAL,
-                                wallet
-                            );
-                        console.timeEnd(
-                            `[${asset.dataset_id}_${
-                                i + 1
-                            }] Asset submitToParanet`
-                        );
-
-                        // Add submitToParanet result to the main result
-                        result.submitToParanetResult = submitToParanetResult;
-                    }
-
                     await publishService.updatePublishingStatus(
                         asset,
                         publishStatus,

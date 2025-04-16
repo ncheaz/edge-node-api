@@ -59,9 +59,13 @@ class PublishService {
         async addJobForWallet(wallet, action) {
             const qKey = this.createQueryKey(wallet);
             const actionId = `${qKey}__${Math.random()}`;
+            console.log(`Creating job with ID: ${actionId}`);
 
             if (!this._queues[qKey]) {
                 // Initialize queue for the wallet
+                console.log(
+                    `Initializing new queue for wallet: ${wallet.wallet}`
+                );
                 this._queues[qKey] = new Queue(qKey, {
                     connection: publishQueueConnection,
                     telemetry: new BullMQOtel('publish-service', '0.0.1')
@@ -73,12 +77,20 @@ class PublishService {
                     qKey,
                     async ({ data }) => {
                         console.log('Running action:', data.actionId);
-                        if (this._actions[data.actionId])
-                            return await this._actions[data.actionId]();
-                        else
-                            throw new UnrecoverableError(
-                                'Unexpected error - no job action.'
+                        try {
+                            if (this._actions[data.actionId])
+                                return await this._actions[data.actionId]();
+                            else
+                                throw new UnrecoverableError(
+                                    'Unexpected error - no job action.'
+                                );
+                        } catch (error) {
+                            console.log(
+                                `Job execution error for ${data.actionId}:`,
+                                error.message
                             );
+                            throw error; // Re-throw to trigger job failure handling
+                        }
                     },
                     {
                         connection: publishQueueConnection,
@@ -93,6 +105,9 @@ class PublishService {
 
             //add job to the queue
             this._actions[actionId] = action;
+            console.log(
+                `Adding job ${actionId} to queue with 10 retry attempts`
+            );
             return await this._queues[qKey].add(
                 actionId,
                 { actionId },
@@ -266,7 +281,33 @@ class PublishService {
                     );
                     this.publishQueue.jobCleanup(curatedJob);
 
-                    // Result will be returned as is, submitToParanet will be handled separately in the controller
+                    if (
+                        curatedResult?.operation?.publish?.status ===
+                        OPERATION_STATUSES.COMPLETED
+                    ) {
+                        console.time(
+                            `[${asset.dataset_id}_${
+                                i + 1
+                            }] Asset submitToParanet`
+                        );
+                        const submitToParanetResult =
+                            await this.submitToParanet(
+                                curatedResult.UAL,
+                                wallet
+                            );
+                        console.timeEnd(
+                            `[${asset.dataset_id}_${
+                                i + 1
+                            }] Asset submitToParanet`
+                        );
+
+                        curatedResult.operation.submitToParanet = {
+                            status: submitToParanetResult.UAL
+                                ? OPERATION_STATUSES.COMPLETED
+                                : OPERATION_STATUSES.FAILED
+                        };
+                    }
+
                     return curatedResult;
                 } catch (error) {
                     console.timeEnd(
@@ -444,8 +485,8 @@ class PublishService {
         wallet = null
     ) {
         asset.publishing_status = status;
-        asset.operation_id = result?.operation?.localStore?.operationId
-            ? result.operation.localStore.operationId
+        asset.operation_id = result?.operation?.publish?.operationId
+            ? result.operation.publish.operationId
             : null;
         asset.operation_message =
             operation_message !== null
@@ -465,14 +506,19 @@ class PublishService {
     }
 
     parseOperationMessage(result) {
-        if (result?.operation?.localStore?.errorType) {
-            return result?.operation?.localStore?.errorMessage;
+        if (result?.operation?.publish?.errorType) {
+            return result?.operation?.publish?.errorMessage;
         }
         return null;
     }
 
     defineStatus(status, submitToParanetStatus) {
+        console.log(
+            `defineStatus called with status: "${status}", submitToParanetStatus: "${submitToParanetStatus}"`
+        );
+
         if (status && status === 'FINALIZED') {
+            console.log('Status is FINALIZED - returning COMPLETED');
             return OPERATION_STATUSES.COMPLETED;
         }
         if (
@@ -480,8 +526,14 @@ class PublishService {
                 status === OPERATION_STATUSES.REPLICATE_END) &&
             submitToParanetStatus
         ) {
+            console.log(
+                'Status meets completion criteria - returning COMPLETED'
+            );
             return OPERATION_STATUSES.COMPLETED;
         } else {
+            console.log(
+                `Status does not meet completion criteria - returning FAILED. Status: ${status}`
+            );
             return OPERATION_STATUSES.FAILED;
         }
     }
