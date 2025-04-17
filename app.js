@@ -51,7 +51,7 @@ router.use('/knowledge-bank', knowledgeBankRoutes);
 router.use('/notifications', notificationRoutes);
 
 const bullBoard = require('./bull-board');
-router.use(bullBoard.basePath, bullBoard.router);
+app.use(bullBoard.basePath, bullBoard.router);
 
 app.use(process.env.ROUTES_PREFIX || '/', router);
 

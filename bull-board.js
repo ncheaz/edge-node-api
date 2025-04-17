@@ -2,7 +2,7 @@ const { createBullBoard } = require('@bull-board/api');
 const { BullMQAdapter } = require('@bull-board/api/bullMQAdapter');
 const { ExpressAdapter } = require('@bull-board/express');
 
-const basePath = '/bull-board';
+const basePath = (process.env.ROUTES_PREFIX || '/') + 'bull-board';
 
 const serverAdapter = new ExpressAdapter();
 serverAdapter.setBasePath(basePath);
