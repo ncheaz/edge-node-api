@@ -17,6 +17,11 @@ const bullBoard = require('../bull-board');
 const { BullMQOtel } = require('bullmq-otel');
 
 const publishQueueConnection = new redis({
+    port: process.env.REDIS_PORT,
+    host: process.env.REDIS_HOST,
+    username: process.env.REDIS_USERNAME,
+    password: process.env.REDIS_PASSWORD,
+    db: process.env.REDIS_DB,
     maxRetriesPerRequest: null
 });
 

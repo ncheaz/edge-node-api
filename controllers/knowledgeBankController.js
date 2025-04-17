@@ -412,7 +412,14 @@ exports.confirmAndCreateAssets = async (req, res) => {
     }
 };
 
-const redisConnection = new redis({ maxRetriesPerRequest: null });
+const redisConnection = new redis({
+    port: process.env.REDIS_PORT,
+    host: process.env.REDIS_HOST,
+    username: process.env.REDIS_USERNAME,
+    password: process.env.REDIS_PASSWORD,
+    db: process.env.REDIS_DB,
+    maxRetriesPerRequest: null
+});
 const importCreateAsyncQueue = {
     _q: new Queue('import-create', {
         connection: redisConnection,
