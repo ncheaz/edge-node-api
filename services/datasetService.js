@@ -3,7 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const { OPERATION_STATUSES } = require('../helpers/utils');
 
-exports.processUpload = async (file) => {
+exports.processUpload = async file => {
     // Logic for processing the uploaded file and saving the dataset
 };
 
@@ -39,19 +39,23 @@ exports.storeStagedAssetsToStorage = async (
     for (let index = 0; index < inputStagedAssets.length; index++) {
         const row = inputStagedAssets[index];
         let transformedToPrivateAsset = {};
-        if(publishMode !== 'public') {
+        if (publishMode !== 'public') {
             transformedToPrivateAsset.private = row;
         } else {
             transformedToPrivateAsset.public = row;
         }
-        
-        const filename = `KA-OUTPUT-${index + 1}-FROM-FILE-${inputDatasetDBRecord.filename.replace('.json', '').replace('.pdf', '')}.json`;
+
+        const filename = `KA-OUTPUT-${
+            index + 1
+        }-FROM-FILE-${inputDatasetDBRecord.filename
+            .replace('.json', '')
+            .replace('.pdf', '')}.json`;
         const filepath = path.join(__dirname, '../storage/assets', filename);
         const relativeFilePath = `/storage/assets/${filename}`;
         const jsonData = JSON.stringify(transformedToPrivateAsset, null, 2); // Pretty print with 2-space indentation
 
         try {
-            await fs.writeFile(filepath, jsonData, 'utf8', (err) => {});
+            await fs.writeFile(filepath, jsonData, 'utf8', err => {});
             assetsData[filename] = transformedToPrivateAsset;
             filenames.push({ filename, relativeFilePath });
         } catch (err) {
@@ -94,7 +98,7 @@ exports.storeUpdatedKAContent = async (asset, knowledgeAssetContent) => {
     try {
         const filepath = path.join(__dirname, `../${asset.url}`);
         let jsonData = JSON.stringify(knowledgeAssetContent, null, 2);
-        await fs.writeFile(filepath, jsonData, 'utf8', (err) => {});
+        await fs.writeFile(filepath, jsonData, 'utf8', err => {});
         return asset;
     } catch (err) {
         console.error('Error updating JSON file:', err);
@@ -111,7 +115,7 @@ exports.markDatasetAsFailed = async (inputDatasetDBRecordId, error_message) => {
     }
 };
 
-exports.markDatasetAsInProgress = async (inputDatasetDBRecordId) => {
+exports.markDatasetAsInProgress = async inputDatasetDBRecordId => {
     let dataset = await Dataset.findByPk(inputDatasetDBRecordId);
     if (dataset) {
         dataset.processing_status = OPERATION_STATUSES['IN-PROGRESS'];
@@ -138,4 +142,15 @@ exports.storePipelineInfo = async (inputDatasetDBRecord, pipelineId, runId) => {
     inputDatasetDBRecord.pipeline_id = pipelineId;
     inputDatasetDBRecord.run_id = runId;
     return await inputDatasetDBRecord.save();
+};
+
+exports.getStatus = async inputDatasetDBRecordId => {
+    const dataset = await Dataset.findByPk(inputDatasetDBRecordId);
+    const assets = await Asset.findAll({
+        where: { dataset_id: inputDatasetDBRecordId }
+    });
+    return {
+        ...dataset.dataValues,
+        assets
+    };
 };

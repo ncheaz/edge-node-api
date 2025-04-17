@@ -6,6 +6,7 @@ if (process.env.OTEL_ENABLED?.toLowerCase() === 'true') {
 const express = require('express');
 // const { createAssetJob } = require('./queue');
 require('./sync-assets-queue');
+require('./retry-publish-queue');
 const cors = require('cors');
 const cookieParser = require('cookie-parser');
 const app = express();
@@ -48,6 +49,10 @@ const router = express.Router();
 router.use('/dashboard', dashboardRoutes);
 router.use('/knowledge-bank', knowledgeBankRoutes);
 router.use('/notifications', notificationRoutes);
+
+const bullBoard = require('./bull-board');
+app.use(bullBoard.basePath, bullBoard.router);
+
 app.use(process.env.ROUTES_PREFIX || '/', router);
 
 const server = app.listen(port, () => {

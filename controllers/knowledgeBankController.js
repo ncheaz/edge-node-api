@@ -3,12 +3,19 @@ const kMiningService = require('../services/kMiningService');
 const path = require('path');
 const fs = require('fs');
 const { Asset, SyncedAsset } = require('../models');
-const { OPERATION_STATUSES } = require('../helpers/utils');
+const {
+    OPERATION_STATUSES,
+    DKG_CONSTS,
+    getBlockchainFromUAL
+} = require('../helpers/utils');
 const publishService = require('../services/publishService.js');
 const vectorService = require('../services/vectorService.js');
 const { Op, Sequelize } = require('sequelize');
 const internalSequelize = require('../models/index');
 const milvusService = require('../services/milvusService.js');
+const redis = require('ioredis');
+const { Queue, Worker } = require('bullmq');
+const { BullMQOtel } = require('bullmq-otel');
 
 exports.getDatasets = async (req, res) => {
     try {
@@ -103,15 +110,13 @@ exports.previewAssetExternal = async (req, res) => {
 
     try {
         // const sessionCookie = req.headers.cookie;
-        //todo: This part is not needed, we should define blockchain based on passed ual. We should refactor it after v1
-        let wallets = await publishService.getWallets(req);
-        const wallet = await publishService.defineNextWallet(wallets);
-        let blockchain = publishService.defineBlockchainSettings(wallet);
 
         const userConfig = req.user.config;
         const formattedUserConfig = publishService.setUserConfig(userConfig);
 
-        const DkgClient = publishService.initDkgClient(blockchain);
+        const DkgClient = publishService.initDkgClient(
+            getBlockchainFromUAL(assetUAL)
+        );
         let result;
         if (formattedUserConfig.edge_node_publish_mode === 'public') {
             result = await DkgClient.asset.get(assetUAL);
@@ -174,6 +179,7 @@ exports.importDataset = async (req, res) => {
     try {
         console.time('Store input dataset and prepare KMining request');
         if (!req.file) {
+            if (req.datasetIdCb) req.datasetIdCb(null);
             return res.status(400).send('No file uploaded.');
         }
         const sessionCookie = req.headers.cookie;
@@ -184,6 +190,8 @@ exports.importDataset = async (req, res) => {
             relativePath,
             req.file.filename
         );
+        if (req.datasetIdCb) req.datasetIdCb(inputDatasetDBRecord.id);
+
         await datasetService.updateDatasetProcessingStatus(
             inputDatasetDBRecord.id,
             OPERATION_STATUSES['IN-PROGRESS']
@@ -239,6 +247,7 @@ exports.importDataset = async (req, res) => {
     } catch (e) {
         console.error(e);
         if (inputDatasetDBRecord) {
+            if (req.datasetIdCb) req.datasetIdCb(inputDatasetDBRecord.id);
             await datasetService.updateDatasetProcessingStatus(
                 inputDatasetDBRecord.id,
                 OPERATION_STATUSES.FAILED,
@@ -253,126 +262,148 @@ exports.importDataset = async (req, res) => {
 
 exports.confirmAndCreateAssets = async (req, res) => {
     try {
-        console.time('Prepare config');
         const { knowledgeAssets } = req.body;
-        // const sessionCookie = req.headers.cookie;
         let wallets = await publishService.getWallets(req);
         const userConfig = req.user.config;
-        publishService.setUserConfig(userConfig);
-        console.timeEnd('Prepare config');
+        const formattedUserConfig = publishService.setUserConfig(userConfig);
+        const edgeNodePublishMode = formattedUserConfig.edge_node_publish_mode;
+        const paranetUAL = formattedUserConfig.edge_node_paranet_ual;
 
-        if (knowledgeAssets.length > 0) {
-            for (let index = 0; index < knowledgeAssets.length; index++) {
-                let { assetId, content } = knowledgeAssets[index];
-                let asset = await Asset.findByPk(assetId);
-                let wallet = null;
+        if (knowledgeAssets.length === 0)
+            throw new Error('You must provide at least one knowledge asset.');
 
-                try {
-                    console.time('Before create');
-                    await datasetService.storeUpdatedKAContent(
-                        asset,
-                        JSON.parse(content)
+        const promises = knowledgeAssets.map((ka, i) => async () => {
+            let asset = null;
+            let wallet = null;
+            let result = null;
+
+            try {
+                asset = await Asset.findByPk(ka.assetId);
+                const assetContent = JSON.parse(ka.content);
+                await datasetService.storeUpdatedKAContent(asset, assetContent);
+                const publishServiceEndpoint = req.user.config.find(
+                    item => item.option === 'publish_service_endpoint'
+                ).value;
+
+                while (
+                    asset.publishing_status !== OPERATION_STATUSES.COMPLETED
+                ) {
+                    if (
+                        Date.now() - asset.updated_at.getTime() >=
+                        10 * 60 * 1000
+                    ) {
+                        // 10 minutes
+                        throw new Error(
+                            `Operation timeout. Asset internal id ${asset.id}`
+                        );
+                    }
+
+                    console.time(
+                        `[${asset.dataset_id}_${i + 1}] Before create`
                     );
-                    const publishServiceEndpoint = req.user.config.find(
-                        item => item.option === 'publish_service_endpoint'
-                    ).value;
-
+                    wallet = await publishService.defineNextWallet(wallets);
                     await publishService.updatePublishingStatus(
                         asset,
                         OPERATION_STATUSES['IN-PROGRESS'],
                         null,
-                        null
-                    );
-
-                    wallet = await publishService.defineNextWallet(wallets);
-                    console.timeEnd('Before create');
-
-                    console.time('Asset create');
-                    const result = await publishService.createAsset(
-                        publishServiceEndpoint,
-                        JSON.parse(content),
+                        null,
                         wallet
                     );
-                    console.timeEnd('Asset create');
-                    if (
-                        result?.operation?.publish ||
-                        result?.operation?.submitToParanet
-                    ) {
-                        const operationStatus = publishService.defineStatus(
-                            result?.operation?.finality?.status
-                        );
-                        await publishService.updatePublishingStatus(
-                            asset,
-                            operationStatus,
-                            result,
-                            result?.operation?.publish?.errorMessage,
-                            wallet
-                        );
+                    console.timeEnd(
+                        `[${asset.dataset_id}_${i + 1}] Before create`
+                    );
 
-                        if (operationStatus === OPERATION_STATUSES.COMPLETED) {
-                            const vectorizationEnabled =
-                                req.user.config.find(
-                                    item =>
-                                        item.option === 'vectorization_enabled'
-                                )?.value || null;
-                            if (vectorizationEnabled === 'true') {
-                                await vectorService.vectorizeKnowledgeAsset(
-                                    result,
-                                    content,
-                                    req,
-                                    sessionCookie
-                                );
-                            } else {
-                                console.log('Skipping vectorization');
-                            }
-                        }
-                    } else {
-                        await publishService.updatePublishingStatus(
-                            asset,
-                            OPERATION_STATUSES.FAILED,
-                            result,
-                            'Something went wrong! Publish data is missing.',
-                            wallet
-                        );
+                    console.time(`[${asset.dataset_id}_${i + 1}] Asset create`);
+                    result = await publishService.createAsset(
+                        publishServiceEndpoint,
+                        assetContent,
+                        wallet
+                    );
+                    console.timeEnd(
+                        `[${asset.dataset_id}_${i + 1}] Asset create`
+                    );
 
-                        return res.status(500).json({
-                            error: 'An error occurred while creating the knowledge asset',
-                            details: 'Failed to store the asset locally.'
-                        });
-                    }
-                    if (knowledgeAssets.length === 1) {
-                        return res.status(200).json({
-                            message: 'Knowledge asset created.',
-                            data: {
-                                UAL: result.UAL,
-                                assertionId: result.publicAssertionId,
-                                transactionHash:
-                                    result?.operation?.mintKnowledgeAsset
-                                        ?.transactionHash,
-                                status: publishService.defineStatus(
-                                    result?.operation?.finality?.status
-                                )
-                            }
-                        });
-                    }
-                } catch (e) {
-                    console.error(e);
+                    const publishStatus = result?.UAL
+                        ? OPERATION_STATUSES.COMPLETED
+                        : OPERATION_STATUSES.FAILED;
+
                     await publishService.updatePublishingStatus(
                         asset,
-                        OPERATION_STATUSES.FAILED,
-                        null,
-                        e.message,
+                        publishStatus,
+                        result,
+                        publishStatus === OPERATION_STATUSES.COMPLETED
+                            ? null
+                            : 'Something went wrong! Publish data is missing.',
                         wallet
                     );
-                    return res.status(500).json({
-                        error: 'An error occurred while creating the knowledge asset',
-                        details: e.message
-                    });
+
+                    if (publishStatus === OPERATION_STATUSES.COMPLETED) {
+                        break;
+                    }
                 }
+
+                return asset;
+            } catch (e) {
+                console.error(e);
+                await publishService.updatePublishingStatus(
+                    asset,
+                    OPERATION_STATUSES.FAILED,
+                    result,
+                    e.message,
+                    wallet
+                );
+                throw e;
             }
+        });
+
+        const results = await Promise.allSettled(promises.map(f => f()));
+
+        if (results.length === 1) {
+            const asset = results[0].value;
+            if (!asset?.ual) {
+                return res.status(500).json({
+                    error: 'An error occurred while creating the knowledge asset',
+                    details: `${results[0].reason}`
+                });
+            }
+
+            // Add vectorization if enabled
+            const vectorizationEnabled =
+                req.user.config.find(
+                    item => item.option === 'vectorization_enabled'
+                )?.value || null;
+            if (vectorizationEnabled === 'true') {
+                const sessionCookie = req.headers.cookie;
+                const content = JSON.parse(knowledgeAssets[0].content);
+                try {
+                    await vectorService.vectorizeKnowledgeAsset(
+                        asset,
+                        content,
+                        req,
+                        sessionCookie
+                    );
+                } catch (error) {
+                    console.error('Vectorization error:', error);
+                    // Continue even if vectorization fails
+                }
+            } else {
+                console.log('Skipping vectorization');
+            }
+
+            return res.status(200).json({
+                message: 'Knowledge asset created.',
+                data: {
+                    UAL: asset.ual,
+                    assertionId: asset.assertion_id,
+                    transactionHash: asset.transaction_hash,
+                    status: asset.publishing_status
+                }
+            });
         }
+
         return res.status(200).json({
-            message: 'Creation of knowledge assets has been started.'
+            message: 'Creation of knowledge assets is finished.',
+            results
         });
     } catch (error) {
         console.error(error);
@@ -380,6 +411,118 @@ exports.confirmAndCreateAssets = async (req, res) => {
             error: 'An error occurred while processing the knowledge asset',
             details: error.message
         });
+    }
+};
+
+const redisConnection = new redis({
+    port: process.env.REDIS_PORT,
+    host: process.env.REDIS_HOST,
+    username: process.env.REDIS_USERNAME,
+    password: process.env.REDIS_PASSWORD,
+    db: process.env.REDIS_DB,
+    maxRetriesPerRequest: null
+});
+const importCreateAsyncQueue = {
+    _q: new Queue('import-create', {
+        connection: redisConnection,
+        telemetry: new BullMQOtel('import-create', '0.0.1')
+    }),
+    _w: new Worker(
+        'import-create',
+        async ({ data }) => {
+            console.time('Action ' + data.actionId);
+            let req;
+            let error;
+            try {
+                req = importCreateAsyncQueue._reqMap[data.actionId];
+                if (!req) throw new Error('Request data is missing.');
+                const res = {
+                    statusCode: 0,
+                    status(s) {
+                        this.statusCode = s;
+                        return this;
+                    },
+                    data: {},
+                    json(d) {
+                        this.data = d;
+                    }
+                };
+
+                if (!data.datasetId) await exports.importDataset(req, res);
+                else {
+                    const finalAssets =
+                        await datasetService.getStagedAssetsFromDB(
+                            data.datasetId
+                        );
+                    res.status(200).json({ assets: finalAssets });
+                }
+
+                if (res.statusCode < 400) {
+                    req.body = {
+                        knowledgeAssets: res.data.assets.map(a => ({
+                            ...a,
+                            content: JSON.stringify(a.content)
+                        }))
+                    };
+                    await exports.confirmAndCreateAssets(req, res);
+                }
+            } catch (err) {
+                console.error('Action Error ' + data.actionId, err);
+                error = err;
+            } finally {
+                console.timeEnd('Action ' + data.actionId);
+                delete importCreateAsyncQueue._reqMap[data.actionId];
+                if (error) throw error;
+            }
+        },
+        {
+            connection: redisConnection,
+            concurrency: 10,
+            telemetry: new BullMQOtel('import-create', '0.0.1')
+        }
+    ),
+    _reqMap: {},
+    queueJob(req) {
+        const actionId = `import-create-${Math.random()}`;
+        importCreateAsyncQueue._reqMap[actionId] = req;
+        return this._q.add(
+            actionId,
+            { actionId },
+            {
+                removeOnComplete: true,
+                removeOnFail: true
+            }
+        );
+    }
+};
+require('../bull-board.js').addQueue(importCreateAsyncQueue._q);
+exports.importCreateAsync = async (req, res) => {
+    let didReturn = false;
+    req.datasetIdCb = datasetId => {
+        if (didReturn) return;
+        didReturn = true;
+        console.log(`[${datasetId}] Started processing dataset`);
+        if (!datasetId)
+            res.status(400).json({
+                datasetId,
+                error: 'Unknown error occurred.'
+            });
+        else {
+            job.updateData({ ...job.data, datasetId });
+            res.status(202).json({ datasetId });
+        }
+    };
+    const job = await importCreateAsyncQueue.queueJob(req);
+};
+
+exports.getDatasetStatus = async (req, res) => {
+    try {
+        const { datasetId } = req.params;
+        const status = await datasetService.getStatus(datasetId);
+        res.status(202).json(status);
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({ error: error.message });
     }
 };
 
