@@ -17,4 +17,13 @@ const DKG_CONSTS = {
     }
 };
 
-module.exports = { OPERATION_STATUSES, DKG_CONSTS };
+function getBlockchainFromUAL(ual) {
+    if (!ual || typeof ual !== 'string') {
+        return null;
+    }
+
+    const match = ual.match(/^did:dkg:([^:\/]+:[^\/]+)/);
+    return match ? match[1] : null;
+}
+
+module.exports = { OPERATION_STATUSES, DKG_CONSTS, getBlockchainFromUAL };

@@ -3,7 +3,11 @@ const kMiningService = require('../services/kMiningService');
 const path = require('path');
 const fs = require('fs');
 const { Asset, SyncedAsset } = require('../models');
-const { OPERATION_STATUSES, DKG_CONSTS } = require('../helpers/utils');
+const {
+    OPERATION_STATUSES,
+    DKG_CONSTS,
+    getBlockchainFromUAL
+} = require('../helpers/utils');
 const publishService = require('../services/publishService.js');
 const vectorService = require('../services/vectorService.js');
 const { Op, Sequelize } = require('sequelize');
@@ -106,15 +110,13 @@ exports.previewAssetExternal = async (req, res) => {
 
     try {
         // const sessionCookie = req.headers.cookie;
-        //todo: This part is not needed, we should define blockchain based on passed ual. We should refactor it after v1
-        let wallets = await publishService.getWallets(req);
-        const wallet = await publishService.defineNextWallet(wallets);
-        let blockchain = publishService.defineBlockchainSettings(wallet);
 
         const userConfig = req.user.config;
         const formattedUserConfig = publishService.setUserConfig(userConfig);
 
-        const DkgClient = publishService.initDkgClient(blockchain);
+        const DkgClient = publishService.initDkgClient(
+            getBlockchainFromUAL(assetUAL)
+        );
         let result;
         if (formattedUserConfig.edge_node_publish_mode === 'public') {
             result = await DkgClient.asset.get(assetUAL);
