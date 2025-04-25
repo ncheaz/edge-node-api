@@ -75,7 +75,9 @@ class PublishService {
                     connection: publishQueueConnection,
                     telemetry: new BullMQOtel('publish-service', '0.0.1')
                 });
-                this._queueEvents[qKey] = new QueueEvents(qKey);
+                this._queueEvents[qKey] = new QueueEvents(qKey, {
+                    connection: publishQueueConnection
+                });
 
                 // Create a worker for this wallet's queue
                 new Worker(
