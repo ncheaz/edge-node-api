@@ -23,7 +23,7 @@
         "cors": "^2.8.5",
         "crypto": "^1.0.1",
         "dkg-evm-module": "^8.0.0",
-        "dkg.js": "^8.0.8",
+        "dkg.js": "^8.0.11",
         "dotenv": "^16.4.5",
         "express": "^4.19.2",
         "form-data": "^4.0.0",
