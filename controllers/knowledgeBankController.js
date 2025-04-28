@@ -114,9 +114,9 @@ exports.previewAssetExternal = async (req, res) => {
         const userConfig = req.user.config;
         const formattedUserConfig = publishService.setUserConfig(userConfig);
 
-        const DkgClient = publishService.initDkgClient(
-            getBlockchainFromUAL(assetUAL)
-        );
+        const DkgClient = publishService.initDkgClient({
+            name: getBlockchainFromUAL(assetUAL)
+        });
         let result;
         if (formattedUserConfig.edge_node_publish_mode === 'public') {
             result = await DkgClient.asset.get(assetUAL);
