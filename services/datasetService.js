@@ -39,7 +39,9 @@ exports.storeStagedAssetsToStorage = async (
     for (let index = 0; index < inputStagedAssets.length; index++) {
         const row = inputStagedAssets[index];
         let transformedToPrivateAsset = {};
-        if (publishMode !== 'public') {
+        if (!('@context' in row) && ('private' in row || 'public' in row)) {
+            transformedToPrivateAsset = row;
+        } else if (publishMode !== 'public') {
             transformedToPrivateAsset.private = row;
         } else {
             transformedToPrivateAsset.public = row;
