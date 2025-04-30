@@ -55,7 +55,7 @@ exports.storeStagedAssetsToStorage = async (
         const jsonData = JSON.stringify(transformedToPrivateAsset, null, 2); // Pretty print with 2-space indentation
 
         try {
-            await fs.writeFile(filepath, jsonData, 'utf8', err => {});
+            await fs.promises.writeFile(filepath, jsonData, 'utf8');
             assetsData[filename] = transformedToPrivateAsset;
             filenames.push({ filename, relativeFilePath });
         } catch (err) {
@@ -98,7 +98,7 @@ exports.storeUpdatedKAContent = async (asset, knowledgeAssetContent) => {
     try {
         const filepath = path.join(__dirname, `../${asset.url}`);
         let jsonData = JSON.stringify(knowledgeAssetContent, null, 2);
-        await fs.writeFile(filepath, jsonData, 'utf8', err => {});
+        await fs.promises.writeFile(filepath, jsonData, 'utf8');
         return asset;
     } catch (err) {
         console.error('Error updating JSON file:', err);
