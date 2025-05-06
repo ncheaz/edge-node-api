@@ -56,6 +56,7 @@ exports.authMiddleware = async (req, res, next) => {
             );
 
             if (authResponse.data.authenticated) {
+            // if (true) {
                 req.user = authResponse.data.user;
                 next();
             } else {

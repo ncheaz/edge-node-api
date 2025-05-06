@@ -68,8 +68,11 @@ exports.triggerPipeline = async (
             file.mimetype = await inferMimeType(filePath);
         }
 
+	console.log(`11`);
         formData.append('file', fs.createReadStream(filePath));
+	console.log(`11`);
         formData.append('pipelineId', kMiningPipelineId);
+	console.log(`11`);
         formData.append(
             'fileFormat',
             file.mimetype === 'application/json' ||
@@ -105,6 +108,7 @@ exports.triggerPipeline = async (
             );
         } else {
             const sessionCookie = req.headers.cookie;
+	    console.log(`${kMiningEndpoint}/trigger_pipeline ===> ${kMiningEndpoint}/trigger_pipeline`);
             result = await axios.post(
                 `${kMiningEndpoint}/trigger_pipeline`,
                 formData,
@@ -118,6 +122,7 @@ exports.triggerPipeline = async (
             );
         }
 
+	console.log(`11`);
         if (result.data.message === 'DAG triggered') {
             const pipelineId = result.data.pipeline_id;
             const runId = result.data.run_id;

@@ -37,7 +37,13 @@ const corsOptions = {
     credentials: true // Allow credentials (cookies, authorization headers, etc.)
 };
 
-app.use(cors(corsOptions));
+const corsOptionsAll = {
+    origin: true, // Allow all origins
+    credentials: true // Allow credentials (cookies, authorization headers, etc.)
+};
+
+//app.use(cors(corsOptions));
+app.use(cors(corsOptionsAll));
 app.set('trust proxy', 1);
 
 // Routes
